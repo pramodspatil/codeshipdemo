@@ -5,12 +5,14 @@ development:
   min_messages: warning
   pool: 5
   timeout: 5000
+  host: postgresql
   host_names:
+    - "localhost"
     ### Don't include the port number here. Change the "port" site setting instead, at /admin/site_settings.
     ### If you change this setting you will need to
     ###   - restart sidekiq if you change this setting
     ###   - rebake all to posts using: `RAILS_ENV=production bundle exec rake posts:rebake`
-    - "localhost"
+  user: postgres
 
 # Warning: The database defined as "test" will be erased and
 # re-generated from your development database when you run "rake".
@@ -22,8 +24,10 @@ test:
   min_messages: warning
   pool: 5
   timeout: 5000
+  host: postgresql
   host_names:
     - test.localhost
+  user: postgres
 
 # profile db is used for benchmarking using the script/bench.rb script
 profile:
@@ -34,7 +38,8 @@ profile:
   pool: 5
   timeout: 5000
   host_names:
-    - "localhost"
+    - "postgres"
+  user: postgres
 
 # You may be surprised production is not here, it is sourced from application.rb using a monkey patch
 # This is done for 2 reasons

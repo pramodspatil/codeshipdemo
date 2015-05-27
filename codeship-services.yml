@@ -1,0 +1,16 @@
+app:
+  build:
+    image: flomotlik/discourse
+    dockerfile_path: Dockerfile
+  environment:
+    REDIS_URL: redis://redis:6379
+    SECRET_TOKEN: abcdefghij
+    REDIS_ADDRESS: redis://redis:6379
+    RAILS_ENV: test
+  links:
+    - postgresql
+    - redis
+postgresql:
+  image: postgres:9.3.6
+redis:
+  image: redis:2.8.19
