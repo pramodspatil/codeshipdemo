@@ -5,28 +5,8 @@
 
 bundle exec rake sleep db:create db:migrate
 
-echo $@
-
 if [ "$1" == "spec" ]; then
-    time bundle exec r$@
-elif [ "$1" == "components_1" ]; then
-  time bundle exec rspec -P "spec/components/**/[a-h]*_spec.rb"
-elif [ "$1" == "components_2" ]; then
-  time bundle exec rspec -P "spec/components/**/[i-n]*_spec.rb"
-elif [ "$1" == "components_3" ]; then
-  time bundle exec rspec -P "spec/components/**/[o-z]*_spec.rb"
-elif [ "$1" == "controllers_1" ]; then
-  time bundle exec rspec -P "spec/controllers/**/[a-h]*_spec.rb"
-elif [ "$1" == "controllers_2" ]; then
-  time bundle exec rspec -P "spec/controllers/**/[i-n]*_spec.rb"
-elif [ "$1" == "controllers_3" ]; then
-  time bundle exec rspec -P "spec/controllers/**/[o-z]*_spec.rb"
-elif [ "$1" == "models_1" ]; then
-  time bundle exec rspec -P "spec/models/**/[a-h]*_spec.rb"
-elif [ "$1" == "models_2" ]; then
-  time bundle exec rspec -P "spec/models/**/[i-n]*_spec.rb"
-elif [ "$1" == "models_3" ]; then
-  time bundle exec rspec -P "spec/models/**/[o-z]*_spec.rb"
+    time bundle exec rspec
 elif [ "$1" == "plugin" ]; then
     time bundle exec rake plugin:spec
 elif [ "$1" == "qunit" ]; then

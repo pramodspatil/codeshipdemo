@@ -1,52 +1,8 @@
-- service: app
-  command: env
 - type: parallel
   steps:
-
-# Splitting Components
   - service: app
-    command: ./script/ci components_1
-  - service: app
-    command: ./script/ci components_2
-  - service: app
-    command: ./script/ci components_3
-
-# Splitting Controllers
-  - service: app
-    command: ./script/ci controllers_1
-  - service: app
-    command: ./script/ci controllers_2
-  - service: app
-    command: ./script/ci controllers_3
-
-  - service: app
-    command: ./script/ci spec spec/helpers
-  - service: app
-    command: ./script/ci spec spec/integration
-  - service: app
-    command: ./script/ci spec spec/integrity
-  - service: app
-    command: ./script/ci spec spec/jobs
-  - service: app
-    command: ./script/ci spec spec/mailers
-
-# Splitting Models
-  - service: app
-    command: ./script/ci models_1
-  - service: app
-    command: ./script/ci models_2
-  - service: app
-    command: ./script/ci models_3
-
-  - service: app
-    command: ./script/ci spec spec/phantom_js
-  - service: app
-    command: ./script/ci spec spec/serializers
-  - service: app
-    command: ./script/ci spec spec/services
-  - service: app
-    command: ./script/ci spec spec/views
+    command: ./script/ci spec
   - service: app
     command: ./script/ci plugin
-  # - service: app
-  #   command: ./script/ci qunit
+  - service: app
+    command: ./script/ci qunit
