@@ -39,6 +39,7 @@ profile:
   timeout: 5000
   host_names:
     - "postgres"
+  host: postgresql
   user: postgres
 
 # You may be surprised production is not here, it is sourced from application.rb using a monkey patch
