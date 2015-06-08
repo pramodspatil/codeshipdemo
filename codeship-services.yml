@@ -3,7 +3,6 @@ app:
     image: flomotlik/discourse
     dockerfile_path: Dockerfile
   environment:
-    REDIS_URL: redis://redis:6379
     SECRET_TOKEN: abcdefghij
     REDIS_ADDRESS: redis://redis:6379
     RAILS_ENV: test
