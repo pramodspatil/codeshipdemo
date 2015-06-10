@@ -3,7 +3,7 @@
 # Run the test suite on a Codeship build machine.
 #set -e
 
-bundle exec rake sleep db:create db:migrate
+time bundle exec rake sleep db:create db:migrate
 
 if [ "$1" == "spec" ]; then
     time bundle exec rspec
