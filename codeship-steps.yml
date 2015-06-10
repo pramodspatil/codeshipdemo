@@ -1,8 +1,8 @@
 - type: parallel
   steps:
-  #- service: app
-  #  command: ./script/ci spec
+  - service: app
+    command: ./script/ci spec
   - service: app
     command: ./script/ci plugin
-  #- service: app
-  #  command: ./script/ci qunit
+  - service: app
+    command: ./script/ci qunit
