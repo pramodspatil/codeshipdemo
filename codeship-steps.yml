@@ -6,3 +6,5 @@
     command: ./script/ci plugin
   - service: app
     command: ./script/ci qunit
+  - service: app
+    command: phantomjs --help
