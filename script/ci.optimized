@@ -3,12 +3,12 @@
 # Run the test suite on a Codeship build machine.
 #set -e
 
-bundle exec rake sleep db:create db:migrate
+time bundle exec rake sleep db:create db:migrate
 
 echo $@
 
 if [ "$1" == "spec" ]; then
-    time bundle exec r$@
+  time bundle exec r$@
 elif [ "$1" == "components_1" ]; then
   time bundle exec rspec -P "spec/components/**/[a-h]*_spec.rb"
 elif [ "$1" == "components_2" ]; then
