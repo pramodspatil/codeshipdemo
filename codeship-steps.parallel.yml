@@ -1,0 +1,10 @@
+- type: parallel
+  steps:
+  - service: app
+    command: ./script/ci.parallel spec
+  - service: app
+    command: ./script/ci.parallel plugin
+  - service: app
+    command: ./script/ci.parallel qunit
+  - service: app
+    command: phantomjs --help

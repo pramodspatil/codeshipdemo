@@ -1,0 +1,9 @@
+#!/bin/bash
+# Usage: script/ci [setup]
+# Run the test suite on a Codeship build machine.
+#set -e
+
+time bundle exec rake sleep db:create db:migrate
+time bundle exec rspec
+time bundle exec rake plugin:spec
+time bundle exec rake qunit:test
