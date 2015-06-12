@@ -1,0 +1,5 @@
+#!/bin/bash
+
+mkdir -p tmp/logs
+
+time ./run_multiple_docker_builds 2>&1 | tee tmp/logs/benchmark_run.log
