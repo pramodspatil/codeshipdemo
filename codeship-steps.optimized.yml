@@ -3,48 +3,48 @@
 
 # Splitting Components
   - service: app
-    command: ./script/ci.optimized components_1
+    command: ./script/ci/ci.optimized components_1
   - service: app
-    command: ./script/ci.optimized components_2
+    command: ./script/ci/ci.optimized components_2
   - service: app
-    command: ./script/ci.optimized components_3
+    command: ./script/ci/ci.optimized components_3
 
 # Splitting Controllers
   - service: app
-    command: ./script/ci.optimized controllers_1
+    command: ./script/ci/ci.optimized controllers_1
   - service: app
-    command: ./script/ci.optimized controllers_2
+    command: ./script/ci/ci.optimized controllers_2
   - service: app
-    command: ./script/ci.optimized controllers_3
+    command: ./script/ci/ci.optimized controllers_3
 
   - service: app
-    command: ./script/ci.optimized spec spec/helpers
+    command: ./script/ci/ci.optimized spec spec/helpers
   - service: app
-    command: ./script/ci.optimized spec spec/integration
+    command: ./script/ci/ci.optimized spec spec/integration
   - service: app
-    command: ./script/ci.optimized spec spec/integrity
+    command: ./script/ci/ci.optimized spec spec/integrity
   - service: app
-    command: ./script/ci.optimized spec spec/jobs
+    command: ./script/ci/ci.optimized spec spec/jobs
   - service: app
-    command: ./script/ci.optimized spec spec/mailers
+    command: ./script/ci/ci.optimized spec spec/mailers
 
 # Splitting Models
   - service: app
-    command: ./script/ci.optimized models_1
+    command: ./script/ci/ci.optimized models_1
   - service: app
-    command: ./script/ci.optimized models_2
+    command: ./script/ci/ci.optimized models_2
   - service: app
-    command: ./script/ci.optimized models_3
+    command: ./script/ci/ci.optimized models_3
 
   - service: app
-    command: ./script/ci.optimized spec spec/phantom_js
+    command: ./script/ci/ci.optimized spec spec/phantom_js
   - service: app
-    command: ./script/ci.optimized spec spec/serializers
+    command: ./script/ci/ci.optimized spec spec/serializers
   - service: app
-    command: ./script/ci.optimized spec spec/services
+    command: ./script/ci/ci.optimized spec spec/services
   - service: app
-    command: ./script/ci.optimized spec spec/views
+    command: ./script/ci/ci.optimized spec spec/views
   - service: app
-    command: ./script/ci.optimized plugin
+    command: ./script/ci/ci.optimized plugin
   - service: app
-    command: ./script/ci.optimized qunit
+    command: ./script/ci/ci.optimized qunit

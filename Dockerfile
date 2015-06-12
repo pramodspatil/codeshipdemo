@@ -9,7 +9,7 @@ RUN \
     libpq-dev \
     nodejs \
     apt-utils \
-    vim git wget libfreetype6 libfontconfig bzip2
+    vim git wget libfreetype6 libfontconfig bzip2 time
 RUN mkdir -p /app
 WORKDIR /app
 ADD Gemfile /app/Gemfile

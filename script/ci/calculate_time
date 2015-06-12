@@ -1,0 +1,7 @@
+
+
+with_time () {
+  time_format="COMMAND_RESULTS: date = '$(date)', command = '%C', host = '$(hostname)', times = { user = %U, system = %S, elapsed = %e }"
+  /usr/bin/time --help
+  /usr/bin/time -f "$time_format" $@
+}
