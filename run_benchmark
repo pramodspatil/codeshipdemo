@@ -4,4 +4,4 @@ mkdir -p tmp/logs
 
 time ./run_multiple_docker_builds.sh 2>&1 | tee tmp/logs/benchmark_run.log
 
-grep COMMAND_RESULTS tmp/logs/* &> benchmark_results
+grep COMMAND_RESULTS tmp/logs/* &> tmp/logs/benchmark_results
