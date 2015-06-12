@@ -3,12 +3,16 @@
 # Run the test suite on a Codeship build machine.
 #set -e
 
-time bundle exec rake sleep db:create db:migrate
+my_dir="$(dirname "$0")"
+
+source $my_dir/calculate_time
+
+with_time bundle exec rake sleep db:create db:migrate
 
 if [ "$1" == "spec" ]; then
-    time bundle exec rspec
+    with_time bundle exec rspec
 elif [ "$1" == "plugin" ]; then
-    time bundle exec rake plugin:spec
+    with_time bundle exec rake plugin:spec
 elif [ "$1" == "qunit" ]; then
-    time bundle exec rake qunit:test
+    with_time bundle exec rake qunit:test
 fi

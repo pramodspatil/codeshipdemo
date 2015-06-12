@@ -2,9 +2,9 @@
 
 server=$1
 
-for times in {1..10}
+for times in {1..5}
 do
-  for build in serial #optimized parallel
+  for build in optimized #parallel serial
   do
     cp codeship-steps.$build.yml codeship-steps.yml
     echo "Activating Docker Machine: $build.$server.$times"
@@ -15,8 +15,7 @@ do
     eval "$(docker-machine env $server)"
     env | grep DOCKER
     mkdir -p tmp/logs
-    #time jet steps &>
-    echo $server > tmp/logs/$build.$server.$times.log
+    time jet steps &> tmp/logs/$build.$server.$times.log
     echo "-----------------"
   done
 done
