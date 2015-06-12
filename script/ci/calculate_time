@@ -1,5 +1,4 @@
 with_time () {
   time_format="COMMAND_RESULTS: command = '%C', time = %e"
-  /usr/bin/time --help
   /usr/bin/time -f "$time_format" $@
 }
