@@ -1,2 +1,2 @@
-service: app
-command: phantomjs --help
+- service: app
+  command: phantomjs --help
