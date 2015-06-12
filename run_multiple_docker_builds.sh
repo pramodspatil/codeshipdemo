@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for build in optimized parallel serial
+for build in serial #optimized parallel
 do
   cp codeship-steps.$build.yml codeship-steps.yml
   for server in t2.medium c4.large c4xlarge
@@ -11,7 +11,8 @@ do
     docker-machine ls
     eval "$(docker-machine env $server)"
     env | grep DOCKER
-    time jet steps > $build.$server.log
+    mkdir -p tmp/logs
+    time jet steps &> tmp/logs/$build.$server.log
     echo "-----------------"
   done
 done
