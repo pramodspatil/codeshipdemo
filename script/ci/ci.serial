@@ -1,0 +1,13 @@
+#!/bin/bash
+# Usage: script/ci [setup]
+# Run the test suite on a Codeship build machine.
+#set -e
+
+my_dir="$(dirname "$0")"
+
+source $my_dir/calculate_time
+
+with_time bundle exec rake sleep db:create db:migrate
+with_time bundle exec rspec
+with_time bundle exec rake plugin:spec
+with_time bundle exec rake qunit:test
