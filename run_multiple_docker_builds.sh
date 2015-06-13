@@ -16,6 +16,7 @@ do
     env | grep DOCKER
     mkdir -p tmp/logs
     time jet steps &> tmp/logs/$build.$server.$times.log
+    bash -lc "docker_cleanup" &> tmp/logs/$build.$server.$times.cleanup.log
     echo "-----------------"
   done
 done
