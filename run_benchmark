@@ -1,7 +1,17 @@
 #!/bin/bash
 
 mkdir -p tmp/logs
+docker_machine=`docker-machine ls | grep $1`
+
+if [ -z "$docker_machine" ]
+then
+  docker-machine create --driver amazonec2 --amazonec2-instance-type "$1"  --amazonec2-vpc-id vpc-eb65068e --amazonec2-zone "c" $1
+else
+  echo "Docker Machine exists: $docker_machine"
+fi
 
 time ./run_multiple_docker_builds.sh $@ 2>&1 | tee tmp/logs/benchmark_run.$1.log
 
 grep COMMAND_RESULTS tmp/logs/**/* &> tmp/logs/benchmark_results.$1.log
+
+#docker-machine rm $1
