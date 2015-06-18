@@ -12,6 +12,4 @@ fi
 
 time ./run_multiple_docker_builds.sh $@ 2>&1 | tee tmp/logs/benchmark_run.$1.log
 
-grep COMMAND_RESULTS tmp/logs/**/* &> tmp/logs/benchmark_results.$1.log
-
 #docker-machine rm $1
