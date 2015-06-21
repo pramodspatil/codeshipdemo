@@ -32,7 +32,7 @@ do
     time jet steps &> $log_path
     jet_exit_status=$?
     echo "EXIT_STATUS: $jet_exit_status"
-    cpu_time=`grep -r COMMAND_RESULTS $log_path | grep -o "\d*\.\d*$" | paste -sd+ - | bc`
+    cpu_time=`grep -r COMMAND_RESULTS $log_path | grep -Eo "[0-9]+.[0-9]+" | paste -sd+ - | bc`
     echo "CPU TIME: $cpu_time"
     echo "-----------------"
   done
