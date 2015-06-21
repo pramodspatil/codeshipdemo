@@ -10,6 +10,10 @@ else
   echo "Docker Machine exists: $docker_machine"
 fi
 
+docker-machine start $1
+
 time ./run_multiple_docker_builds.sh $@ 2>&1 | tee tmp/logs/benchmark_run.$1.log
+
+docker-machine stop $1
 
 #docker-machine rm $1
