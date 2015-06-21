@@ -17,10 +17,8 @@ do
     echo "Activating Docker Machine: $build.$server.$times"
     echo "-----------------"
     date
-    docker-machine active $server
     docker-machine ls
     eval "$(docker-machine env $server)"
-
     echo "--- DOCKER CLEANUP ---"
     docker-machine ssh $server "sudo docker run -v /var/run/docker.sock:/var/run/docker.sock -v /var/lib/docker:/var/lib/docker --rm martin/docker-cleanup-volumes" &> $log_path.cleanup
     docker-machine ssh $server "df -h"
@@ -29,11 +27,11 @@ do
     env | grep DOCKER
 
     echo "--- DOCKER BUILD ---"
-    time jet steps &> $log_path
+    /usr/bin/time -f "TOTAL_RUNTIME = %e" bash -c "jet steps &> $log_path"
     jet_exit_status=$?
     echo "EXIT_STATUS: $jet_exit_status"
     cpu_time=`grep -r COMMAND_RESULTS $log_path | grep -Eo "[0-9]+.[0-9]+" | paste -sd+ - | bc`
-    echo "CPU TIME: $cpu_time"
+    echo "CPU_TIME: $cpu_time"
     echo "-----------------"
   done
 done
