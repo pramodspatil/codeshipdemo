@@ -2,7 +2,7 @@
 
 server=$1
 
-for build in optimized serial parallel
+for build in optimized serial parallel simple
 do
   log_folder_name="tmp/logs/$server/$build"
   rm -fr $log_folder_name
@@ -58,6 +58,7 @@ do
     echo "LEFT OVER CONTAINERS"
     docker ps -a
     docker images -a
+    echo "RUNNING_PROCESSES: `docker-machine ssh $server "ps -A | wc -l"`"
     echo "-----------------"
   done
 done
