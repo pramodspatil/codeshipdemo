@@ -8,7 +8,7 @@ do
   rm -fr $log_folder_name
   mkdir -p $log_folder_name
 
-  for times in {1..5}
+  for times in {1..10}
   do
     log_file_name="$build.$times"
     log_path="$log_folder_name/$log_file_name.log"
@@ -57,7 +57,6 @@ do
     # List containers and images that remain
     echo "LEFT OVER CONTAINERS"
     docker ps -a
-    docker images -a
     echo "RUNNING_PROCESSES: `docker-machine ssh $server "ps -A | wc -l"`"
     echo "-----------------"
   done
