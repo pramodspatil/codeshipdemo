@@ -13,3 +13,5 @@ fi
 docker-machine start $1
 
 time ./run_multiple_docker_builds.sh $@ 2>&1 | tee tmp/logs/benchmark_run.$1.log
+
+docker-machine rm $1
