@@ -1,0 +1,3 @@
+#!/bin/bash
+
+time cat script/benchmarks/aws_machines | xargs -L 1 script/benchmarks/run_benchmark_for_machine 2>&1 | tee tmp/logs/benchmark_master.log
