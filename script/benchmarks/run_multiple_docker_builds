@@ -12,8 +12,8 @@ do
   do
     log_file_name="$build.$times"
     log_path="$log_folder_name/$log_file_name.log"
+    steps_file="codeship-steps.$build.yml"
 
-    cp codeship-steps.$build.yml codeship-steps.yml
     echo "Activating Docker Machine: $build.$server.$times"
     echo "-----------------"
     date
@@ -24,7 +24,7 @@ do
     env | grep DOCKER
 
     echo "--- DOCKER BUILD ---"
-    /usr/bin/time -f "TOTAL_RUNTIME = %e" bash -c "jet steps --debug=true --system=true &> $log_path"
+    /usr/bin/time -f "TOTAL_RUNTIME = %e" bash -c "jet steps --debug=true --system=true --steps-path=$steps_file &> $log_path"
     jet_exit_status=$?
     echo "EXIT_STATUS: $jet_exit_status"
     cpu_time=`grep -r COMMAND_RESULTS $log_path | grep -Eo "[0-9]+.[0-9]+" | paste -sd+ - | bc`
