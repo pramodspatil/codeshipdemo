@@ -2,7 +2,7 @@
 
 server=$1
 
-for build in optimized serial parallel #simple
+for build in parallel serial optimized #simple
 do
 
   log_folder_name="tmp/logs/$server/$build"

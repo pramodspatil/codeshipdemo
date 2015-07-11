@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "STARTING BUILD FOR $1"
+
 mkdir -p tmp/logs
 docker_machine=`docker-machine ls | grep $1`
 
