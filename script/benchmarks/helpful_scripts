@@ -1,0 +1,5 @@
+echo "Number of successful or failed builds\n"
+grep EXIT_STATUS tmp/logs/benchmark_run.* | grep -o "[01]$" | sort | uniq -c
+
+echo "Builds with Exit status 0\n"
+grep EXIT_STATUS tmp/logs/benchmark_run.* | grep "1$" | sort
