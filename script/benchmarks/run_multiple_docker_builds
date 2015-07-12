@@ -1,8 +1,10 @@
 #!/bin/bash
 
+source `dirname "$(readlink -f "$0")"`/shared_data
+
 server=$1
 
-for build in parallel serial optimized #simple
+for build in $build_types
 do
 
   log_folder_name="tmp/logs/$server/$build"
