@@ -1,7 +1,0 @@
-my_dir=`dirname "$(readlink -f "$0")"`
-
-aws_machines=`cat $my_dir/aws_machines`
-
-build_types=`cat $my_dir/build_types`
-
-number_regex="([0-9]+\.?[0-9]+?)"
