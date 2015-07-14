@@ -1,0 +1,4 @@
+#!/bin/bash
+
+bundle exec rake sleep db:create db:migrate
+parallel_rspec -n $MAX_BUILDS --only-group $BUILD_NUMBER spec

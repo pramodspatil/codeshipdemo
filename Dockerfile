@@ -16,6 +16,7 @@ ADD Gemfile /app/Gemfile
 ADD Gemfile.lock /app/Gemfile.lock
 ADD vendor /app/vendor
 RUN bundle install -j24
+RUN gem install parallel_tests
 
 # Env
 ENV PHANTOMJS_VERSION 1.9.7
