@@ -1,86 +1,86 @@
 - type: parallel
   steps:
   - service: app
-    command: bash -c "BUILD_NUMBER=1 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=1 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=2 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=2 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=3 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=3 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=4 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=4 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=5 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=5 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=6 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=6 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=7 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=7 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=8 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=8 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=9 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=9 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=10 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=10 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=11 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=11 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=12 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=12 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=13 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=13 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=14 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=14 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=15 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=15 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=16 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=16 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=17 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=17 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=18 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=18 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=19 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=19 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=20 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=20 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=21 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=21 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=22 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=22 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=23 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=23 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=24 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=24 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=25 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=25 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=26 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=26 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=27 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=27 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=28 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=28 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=29 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=29 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=30 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=30 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=31 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=31 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=32 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=32 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=33 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=33 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=34 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=34 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=35 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=35 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=36 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=36 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=37 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=37 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=38 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=38 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=39 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=39 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=40 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=40 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=41 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=41 ./script/ci/ci.run_split_test"
   - service: app
-    command: bash -c "BUILD_NUMBER=42 ./script/ci/run_split_test"
+    command: bash -c "BUILD_NUMBER=42 ./script/ci/ci.run_split_test"
