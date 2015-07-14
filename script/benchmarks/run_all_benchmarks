@@ -1,5 +1,0 @@
-#!/bin/bash
-
-source `dirname "$(readlink -f "$0")"`/shared_data
-
-time echo $aws_machines | xargs -P 3 -L 1 script/benchmarks/run_benchmark_for_machine 2>&1 | tee tmp/logs/benchmark_master.log
