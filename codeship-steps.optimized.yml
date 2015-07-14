@@ -44,7 +44,3 @@
     command: ./script/ci/ci.optimized spec spec/services
   - service: app
     command: ./script/ci/ci.optimized spec spec/views
-  - service: app
-    command: ./script/ci/ci.optimized plugin
-  - service: app
-    command: ./script/ci/ci.optimized qunit
