@@ -6,5 +6,6 @@ source $my_dir/calculate_time
 
 bundle exec rake sleep db:create db:migrate
 mkdir -p tmp
+mkdir -p /data/individual_results
 with_time parallel_rspec -n $MAX_BUILDS --only-group $BUILD_NUMBER spec --runtime-log  /data/combined_results
 cp tmp/parallel_runtime_rspec.log /data/individual_results/parallel_runtime_rspec.$BUILD_NUMBER.log
