@@ -9,5 +9,5 @@ source $my_dir/calculate_time
 
 with_time bundle exec rake sleep db:create db:migrate
 with_time bundle exec rspec
-with_time bundle exec rake plugin:spec
-with_time bundle exec rake qunit:test
+#with_time bundle exec rake plugin:spec
+#with_time bundle exec rake qunit:test
