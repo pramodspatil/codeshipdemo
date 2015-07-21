@@ -1,3 +1,5 @@
+# - service: results
+#   command: ./script/ci/setup_results
 - type: parallel
   steps:
   - service: app
@@ -72,15 +74,5 @@
     command: bash -c "BUILD_NUMBER=35 ./script/ci/ci.run_split_test"
   - service: app
     command: bash -c "BUILD_NUMBER=36 ./script/ci/ci.run_split_test"
-  - service: app
-    command: bash -c "BUILD_NUMBER=37 ./script/ci/ci.run_split_test"
-  - service: app
-    command: bash -c "BUILD_NUMBER=38 ./script/ci/ci.run_split_test"
-  - service: app
-    command: bash -c "BUILD_NUMBER=39 ./script/ci/ci.run_split_test"
-  - service: app
-    command: bash -c "BUILD_NUMBER=40 ./script/ci/ci.run_split_test"
-  - service: app
-    command: bash -c "BUILD_NUMBER=41 ./script/ci/ci.run_split_test"
-  - service: app
-    command: bash -c "BUILD_NUMBER=42 ./script/ci/ci.run_split_test"
+# - service: results
+#   command: script/ci/combine_results
