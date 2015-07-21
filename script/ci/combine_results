@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e
+
+cat /data/individual_results/* > /data/combined_results
+
+aws s3 cp /data/combined_results s3://parallel_results/combined_results

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+set -e
+
+mkdir -p tmp
+mkdir -p /data/individual_results
+
+aws s3 cp s3://parallel_results/combined_results /data/combined_results
+
+cat /data/combined_results

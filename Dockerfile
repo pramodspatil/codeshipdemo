@@ -9,7 +9,8 @@ RUN \
     libpq-dev \
     nodejs \
     apt-utils \
-    vim git wget libfreetype6 libfontconfig bzip2 time
+    vim git wget libfreetype6 libfontconfig bzip2 time python-pip
+RUN pip install awscli
 RUN mkdir -p /app
 WORKDIR /app
 ADD Gemfile /app/Gemfile
