@@ -7,7 +7,6 @@ app:
     REDIS_ADDRESS: redis://redis:6379
     RAILS_ENV: test
     DATABASE_HOST: postgresql
-    MAX_BUILDS: 36
   links:
     - postgresql
     - redis
