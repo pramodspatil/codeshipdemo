@@ -1,0 +1,23 @@
+#!/bin/bash
+
+IN=`cat aws_machines_parallelism`
+
+for i in $IN
+do
+  IFS=';' read -a machine <<< "$i"
+  machine_name=${machine[0]}
+  parallelism=${machine[1]}
+
+  steps_file="codeship-steps.parallel_test.$machine_name.yml"
+
+  echo "
+- type: parallel
+  steps:" > $steps_file
+
+  for i in $(seq 1 $parallelism)
+  do
+  echo "  - service: app
+    command: bash -c \"MAX_BUILDS=$parallelism BUILD_NUMBER=$i ./script/ci/ci.run_split_test\""
+  done >> $steps_file
+
+done

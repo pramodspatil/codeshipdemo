@@ -1,0 +1,12 @@
+t2.medium;2
+t2.large;2
+m4.large;2
+m4.xlarge;4
+m4.2xlarge;8
+m4.4xlarge;16
+m4.10xlarge;40
+c4.large;2
+c4.xlarge;4
+c4.2xlarge;8
+c4.4xlarge;16
+c4.8xlarge;36
