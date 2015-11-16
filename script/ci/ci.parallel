@@ -12,6 +12,8 @@ with_time bundle exec rake sleep db:create db:migrate > MIGRATE_OUTPUT
 
 if [ "$1" == "spec" ]; then
     with_time bundle exec rspec
+elif [ "$1" == "parallel_spec" ]; then
+    with_time parallel_rspec -n $MAX_BUILDS --only-group $BUILD_NUMBER spec
 elif [ "$1" == "plugin" ]; then
     with_time bundle exec rake plugin:spec
 elif [ "$1" == "qunit" ]; then
