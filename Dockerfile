@@ -11,11 +11,11 @@ RUN \
     apt-utils \
     vim git wget libfreetype6 libfontconfig bzip2 time python-pip
 RUN pip install awscli
-RUN mkdir -p /app
-WORKDIR /app
-ADD Gemfile /app/Gemfile
-ADD Gemfile.lock /app/Gemfile.lock
-ADD vendor /app/vendor
+RUN mkdir -p /install
+WORKDIR /install
+ADD Gemfile ./Gemfile
+ADD Gemfile.lock ./Gemfile.lock
+ADD vendor ./vendor
 RUN bundle install -j24
 RUN gem install parallel_tests
 
@@ -32,4 +32,4 @@ RUN \
 
 # Commands
 
-ADD . /app
+WORKDIR /app
