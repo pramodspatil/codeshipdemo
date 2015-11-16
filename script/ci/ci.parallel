@@ -7,7 +7,8 @@ my_dir="$(dirname "$0")"
 
 source $my_dir/calculate_time
 
-with_time bundle exec rake sleep db:create db:migrate
+echo "Setting up the database"
+with_time bundle exec rake sleep db:create db:migrate > MIGRATE_OUTPUT
 
 if [ "$1" == "spec" ]; then
     with_time bundle exec rspec
