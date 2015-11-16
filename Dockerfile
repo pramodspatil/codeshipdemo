@@ -11,7 +11,6 @@ RUN \
     apt-utils \
     vim git wget libfreetype6 libfontconfig bzip2 time python-pip
 
-# Env
 ENV PHANTOMJS_VERSION 1.9.7
 
 RUN \
@@ -32,6 +31,4 @@ COPY vendor ./vendor
 RUN bundle install -j24
 RUN gem install parallel_tests
 
-# Commands
-
-COPY ./ /app
+WORKDIR /code
