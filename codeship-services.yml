@@ -10,11 +10,7 @@ app:
   links:
     - postgresql
     - redis
-  volumes_from:
-    - data
   cached: true
-  volumes:
-    - ./:/app
 postgresql:
   image: postgres:9.3.6
 redis:

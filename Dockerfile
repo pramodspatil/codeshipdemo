@@ -10,14 +10,6 @@ RUN \
     nodejs \
     apt-utils \
     vim git wget libfreetype6 libfontconfig bzip2 time python-pip
-RUN pip install awscli
-RUN mkdir -p /install
-WORKDIR /install
-ADD Gemfile ./Gemfile
-ADD Gemfile.lock ./Gemfile.lock
-ADD vendor ./vendor
-RUN bundle install -j24
-RUN gem install parallel_tests
 
 # Env
 ENV PHANTOMJS_VERSION 1.9.7
@@ -30,6 +22,16 @@ RUN \
   mv /tmp/phantomjs-$PHANTOMJS_VERSION-linux-x86_64/ /srv/var/phantomjs && \
   ln -s /srv/var/phantomjs/bin/phantomjs /usr/bin/phantomjs
 
+RUN pip install awscli
+
+RUN mkdir -p /app
+WORKDIR /app
+COPY Gemfile ./Gemfile
+COPY Gemfile.lock ./Gemfile.lock
+COPY vendor ./vendor
+RUN bundle install -j24
+RUN gem install parallel_tests
+
 # Commands
 
-WORKDIR /app
+COPY ./ /app
