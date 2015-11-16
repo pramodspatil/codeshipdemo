@@ -1,4 +1,4 @@
-- type: parallel
+- type: serial
   encrypted_dockercfg_path: dockercfg.encrypted
   steps:
   - service: app
@@ -7,5 +7,3 @@
     command: ./script/ci/ci.parallel plugin
   - service: app
     command: ./script/ci/ci.parallel qunit
-  - service: app
-    command: phantomjs --help
