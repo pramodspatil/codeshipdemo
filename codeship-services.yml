@@ -1,6 +1,6 @@
 app:
   build:
-    image: flomotlik/discourse
+    image: quay.io/flomotlik/discourse
     dockerfile_path: Dockerfile
   environment:
     SECRET_TOKEN: abcdefghij
