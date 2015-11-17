@@ -1,21 +1,21 @@
 - type: parallel
   encrypted_dockercfg_path: dockercfg.encrypted
   steps:
-  - name: spec_1
-    service: app
-    command: bash -c "MAX_BUILDS=4 BUILD_NUMBER=1 ./script/ci/ci.parallel parallel_spec"
-  - name: spec_2
-    service: app
-    command: bash -c "MAX_BUILDS=4 BUILD_NUMBER=2 ./script/ci/ci.parallel parallel_spec"
-  - name: spec_3
-    service: app
-    command: bash -c "MAX_BUILDS=4 BUILD_NUMBER=3 ./script/ci/ci.parallel parallel_spec"
-  - name: spec_4
-    service: app
-    command: bash -c "MAX_BUILDS=4 BUILD_NUMBER=4 ./script/ci/ci.parallel parallel_spec"
-  - name: plugin specs
-    service: app
-    command: ./script/ci/ci.parallel plugin
+  # - name: spec_1
+  #   service: app
+  #   command: bash -c "MAX_BUILDS=4 BUILD_NUMBER=1 ./script/ci/ci.parallel parallel_spec"
+  # - name: spec_2
+  #   service: app
+  #   command: bash -c "MAX_BUILDS=4 BUILD_NUMBER=2 ./script/ci/ci.parallel parallel_spec"
+  # - name: spec_3
+  #   service: app
+  #   command: bash -c "MAX_BUILDS=4 BUILD_NUMBER=3 ./script/ci/ci.parallel parallel_spec"
+  # - name: spec_4
+  #   service: app
+  #   command: bash -c "MAX_BUILDS=4 BUILD_NUMBER=4 ./script/ci/ci.parallel parallel_spec"
+  # - name: plugin specs
+  #   service: app
+  #   command: ./script/ci/ci.parallel plugin
   - name: qunit
     service: app
     command: ./script/ci/ci.parallel qunit
