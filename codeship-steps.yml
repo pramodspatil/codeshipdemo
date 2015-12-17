@@ -13,9 +13,9 @@
 - type: serial
   tag: master
   steps:
-    - service: demo
+    - service: deploy
       command: deploy_me_to_staging
-    - service: demo
+    - service: deploy
       command: validate_staging.sh
     - service: notifications
       command: notify_team
@@ -35,9 +35,9 @@
 - type: serial
   tag: ^qa/.*$
   steps:
-    - service: demo
+    - service: deploy
       command: ./deploy_me_to_qa
-    - service: demo
+    - service: deploy
       command: validate_qa.sh
     - service: notifications
       command: notify_pusher
