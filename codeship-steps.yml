@@ -11,6 +11,7 @@
 # Whenever we're on the Master branch we deploy our application into staging
 # and notify our team that we've released it
 - type: serial
+  name: master_deployment
   tag: master
   steps:
     - service: deploy
@@ -33,6 +34,7 @@
 # exist yet we could even create it now. And Alex could always deploy into his
 # own QA environment without influencing anybody elses environment.
 - type: serial
+  name: qa_deployment
   tag: ^qa/.*$
   steps:
     - service: deploy
@@ -53,6 +55,7 @@
 # as well as the whole team through a notifications container that the team
 # has set up by themselve.
 - type: serial
+  name: production_deployment
   tag: production
   steps:
     - service: deploy
