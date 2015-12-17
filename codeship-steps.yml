@@ -1,3 +1,4 @@
+# At first we're running all our tests in parallel to make them run fast
 - type: parallel
   encrypted_dockercfg_path: dockercfg.encrypted
   steps:
@@ -7,5 +8,70 @@
     command: ./script/ci/ci.parallel plugin
   - service: app
     command: ./script/ci/ci.parallel qunit
-  - service: app
-    command: phantomjs --help
+# Whenever we're on the Master branch we deploy our application into staging
+# and notify our team that we've released it
+- type: serial
+  tag: master
+  steps:
+    - service: demo
+      command: deploy_me_to_staging
+    - service: demo
+      command: validate_staging.sh
+    - service: notifications
+      command: notify_team
+# Whenever a developer wants to push his branch into a QA environment they
+# can put a git tag starting with qa/ onto a commit and push that into the
+# repository.
+
+# From there Codeship picks it up and runs the following deployment commands
+# and notifies the person who pushed to commit that it was released.
+
+# You could even set up developer specific QA environments by having developers
+# use qa/THEIR_NAME for the git tag. For example Alex would tag a commit as
+# qa/alex and in the deployment script we could use that git tag to decide
+# that we should deploy into a qa environment that is named alex. If it doesn't
+# exist yet we could even create it now. And Alex could always deploy into his
+# own QA environment without influencing anybody elses environment.
+- type: serial
+  tag: ^qa/.*$
+  steps:
+    - service: demo
+      command: ./deploy_me_to_qa
+    - service: demo
+      command: validate_qa.sh
+    - service: notifications
+      command: notify_pusher
+# In this example we want to release to 5%, then 10%, then 50% and then 100%
+# of our servers. To achieve this we're running the deployment script first
+# and then a validation that the deployment worked. In case the validation
+# fails the validation script can then revert on those machines we've already
+# deployed to.
+# Because the scripts don't have to manage any lifecycle and can be run
+# independently its trivial to change the way we deploy (e.g. 5 25 50 in the future)
+# without having to touch the deployment or validation scripts at all.
+# After the deployment finished the developer who implemented it gets notified
+# as well as the whole team through a notifications container that the team
+# has set up by themselve.
+- type: serial
+  tag: production
+  steps:
+    - service: deploy
+      command: deploy_me_to_production_percentage 5
+    - service: deploy
+      command: validate_production_servers
+    - service: deploy
+      command: deploy_me_to_production_percentage 10
+    - service: deploy
+      command: validate_production_servers
+    - service: deploy
+      command: deploy_me_to_production_percentage 50
+    - service: deploy
+      command: validate_production_servers
+    - service: deploy
+      command: deploy_me_to_production_percentage 100
+    - service: deploy
+      command: validate_production_servers
+    - service: notifications
+      command: notify_pusher
+    - service: notifications
+      command: notify_team
