@@ -1,0 +1,28 @@
+language: ruby
+
+env:
+  matrix:
+    - "SPLIT=0"
+    - "SPLIT=1"
+    - "SPLIT=2"
+
+rvm:
+  - 2.2
+
+services:
+  - docker
+
+sudo: required
+
+install:
+    - docker info
+    - script/ci/solano_pre_setup.sh
+
+script: bash -c "case $SPLIT in 0) docker-compose run app ./script/ci/ci.parallel spec ;; 1) docker-compose run app ./script/ci/ci.parallel plugin ;; 2) docker-compose run app ./script/ci/ci.parallel qunit ;; esac"
+
+build:
+    pre_ci_boot:
+      image_name: drydock/u14rub
+      image_tag: prod
+      pull: true
+      options: --privileged=true
