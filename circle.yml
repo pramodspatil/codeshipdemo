@@ -15,17 +15,8 @@ dependencies:
 # configure the database
 # https://circleci.com/docs/configuration#database
 database:
-  pre:
-
-    # boot all containers
-    - docker-compose up -d
-
-    # wait a second to make sure all containers are up and running before the next step
-    - sleep 1
-
-  # create our test DB and load the schema. The DB is named $POSTGRES_DB, as defined in our environment.
   override:
-    - docker-compose run app rake db:create db:migrate
+    - echo "database"
 
 # configure the test run
 # https://circleci.com/docs/configuration#test
@@ -33,4 +24,4 @@ test:
 
   # run the test suite in the application container
   override:
-    - docker-compose run app rspec spec
+    - docker-compose run app ./script/ci/ci.parallel spec
