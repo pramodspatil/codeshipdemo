@@ -5,7 +5,7 @@ system:
   queue: docker
 
 hooks:
-  pre_setup: "docker-compose build"
+  pre_setup: "script/ci/solano_pre_setup.sh"
   worker_setup: "echo 'create dbs'"       # Runs once for each worker to do, e.g., database setup
   post_setup: "echo 'compile assets'"     # Runs once after worker hook before tests
   post_worker: "echo 'capture screenshots'"    # Runs after a worker is done
