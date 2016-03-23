@@ -1,0 +1,35 @@
+# service configuration for our database
+db:
+
+  # use the preferred version of the official Postgres image
+  # see https://hub.docker.com/_/postgres/
+  image: postgres:9.3.6
+
+  # persist the database between containers by storing it in a volume
+  volumes:
+    - docker-example-postgres:/var/lib/postgresql/data
+
+redis:
+  image: redis:3.0.2
+
+# service configuration for our dockerized Rails app
+app:
+
+  # use the Dockerfile next to this file
+  build: .
+
+  # rely on the RAILS_ENV value of the host machine
+  environment:
+    REDIS_ADDRESS: redis://redis:6379
+    RAILS_ENV: test
+    DATABASE_HOST: postgresql
+    SECRET_TOKEN: abcdefghij
+
+  # makes the app container aware of the DB container
+  links:
+    - db
+    - redis
+
+  # expose the port we configured Unicorn to bind to
+  expose:
+    - "3000"
