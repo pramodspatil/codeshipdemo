@@ -32,3 +32,5 @@ RUN bundle install -j24
 RUN gem install parallel_tests
 
 WORKDIR /code
+
+COPY . ./
