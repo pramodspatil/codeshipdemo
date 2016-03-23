@@ -24,4 +24,5 @@ test:
 
   # run the test suite in the application container
   override:
-    - docker-compose run app ./script/ci/ci.parallel spec
+    - case $CIRCLE_NODE_INDEX in 0) docker-compose run app ./script/ci/ci.parallel spec ;; 1) docker-compose run app ./script/ci/ci.parallel plugin ;; 2) docker-compose run app ./script/ci/ci.parallel qunit ;; esac:
+      parallel: true

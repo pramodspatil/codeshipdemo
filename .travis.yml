@@ -1,9 +1,10 @@
 language: ruby
 
-# env:
-#   matrix:
-#     - "RAILS_MASTER=0"
-#     - "RAILS_MASTER=1"
+env:
+  matrix:
+    - "SPLIT=0"
+    - "SPLIT=1"
+    - "SPLIT=2"
 
 rvm:
   - 2.2
@@ -17,4 +18,4 @@ before_install:
     - docker info
     - docker-compose build
 
-script: docker-compose run app ./script/ci/ci.parallel spec
+script: case $SPLIT in 0) docker-compose run app ./script/ci/ci.parallel spec ;; 1) docker-compose run app ./script/ci/ci.parallel plugin ;; 2) docker-compose run app ./script/ci/ci.parallel qunit ;; esac:
