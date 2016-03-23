@@ -1,0 +1,13 @@
+system:
+  docker: true
+  queue: docker
+
+hooks:
+  pre_setup: "sudo docker-compose build"
+
+tests:
+  - docker-compose run app ./script/ci/ci.parallel spec
+  - docker-compose run app ./script/ci/ci.parallel plugin
+  - docker-compose run app ./script/ci/ci.parallel qunit
+
+test_pattern: 'none'
