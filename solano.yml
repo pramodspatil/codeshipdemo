@@ -1,9 +1,15 @@
+ruby_version: ruby-2.2.3
+
 system:
   docker: true
   queue: docker
 
 hooks:
   pre_setup: "sudo docker-compose build"
+  worker_setup: "echo 'create dbs'"       # Runs once for each worker to do, e.g., database setup
+  post_setup: "echo 'compile assets'"     # Runs once after worker hook before tests
+  post_worker: "echo 'capture screenshots'"    # Runs after a worker is done
+  post_build: "echo 'deploy to staging'"  # Runs once on master after entire build completes
 
 tests:
   - docker-compose run app ./script/ci/ci.parallel spec
