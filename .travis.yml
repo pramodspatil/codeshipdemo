@@ -14,7 +14,7 @@ services:
 
 sudo: required
 
-before_install:
+install:
     - docker info
     - docker-compose build
 
