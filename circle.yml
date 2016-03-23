@@ -21,8 +21,6 @@ database:
 # configure the test run
 # https://circleci.com/docs/configuration#test
 test:
-
-  # run the test suite in the application container
   override:
-    - bash -c "case $SPLIT in 0) docker-compose run app ./script/ci/ci.parallel spec ;; 1) docker-compose run app ./script/ci/ci.parallel plugin ;; 2) docker-compose run app ./script/ci/ci.parallel qunit ;; esac:"
-      parallel: true
+    - bash -c "case $SPLIT in 0) docker-compose run app ./script/ci/ci.parallel spec ;; 1) docker-compose run app ./script/ci/ci.parallel plugin ;; 2) docker-compose run app ./script/ci/ci.parallel qunit ;; esac" :
+        parallel: true
