@@ -1,5 +1,3 @@
-
-.git
 *.sublime-project
 aws_machines
 Brewfile
