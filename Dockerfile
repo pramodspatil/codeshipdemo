@@ -34,6 +34,6 @@ COPY Gemfile Gemfile.lock vendor /app/
 RUN \
   cd /app/ \
   && bundle install --jobs 20 --retry 5 \
-  && gem install parallel_tests \
+  && gem install parallel_tests
 
 WORKDIR /code
