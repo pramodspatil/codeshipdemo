@@ -25,7 +25,7 @@ RUN \
   && pip install awscli
 
 RUN \
-  wget --output-document /tmp/phantomjs-linux-x86_64.tar.bz2 "https://s3.amazonaws.com/codeship-packages/phantomjs-${PHANTOMJS_VERSION}-linux-x86_64.tar.bz2" \
+  wget --no-verbose --output-document /tmp/phantomjs-linux-x86_64.tar.bz2 "https://s3.amazonaws.com/codeship-packages/phantomjs-${PHANTOMJS_VERSION}-linux-x86_64.tar.bz2" \
   && tar -xaf /tmp/phantomjs-linux-x86_64.tar.bz2 --directory /tmp/ \
   && mv "/tmp/phantomjs-${PHANTOMJS_VERSION}-linux-x86_64/bin/phantomjs" /usr/bin/phantomjs \
   && rm -rf /tmp/phantomjs-linux-x86_64.tar.bz2 "/tmp/phantomjs-${PHANTOMJS_VERSION}-linux-x86_64"
