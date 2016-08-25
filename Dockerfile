@@ -1,34 +1,39 @@
-FROM ruby:2.2.1
-MAINTAINER flo@codeship.com
+FROM ruby:2.3.1-slim
+MAINTAINER maintainers@codeship.com
+
+ENV \
+  DEBIAN_FRONTEND=noninteractive \
+  PHANTOMJS_VERSION=1.9.7
 
 RUN \
-  apt-get update -y && \
-  apt-get upgrade -y && \
-  DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  apt-get update \
+  && apt-get install -y --no-install-recommends \
+    apt-utils \
     build-essential \
+    bzip2 \
+    git \
+    libfontconfig \
+    libfreetype6 \
     libpq-dev \
     nodejs \
-    apt-utils \
-    vim git wget libfreetype6 libfontconfig bzip2 time python-pip
-
-ENV PHANTOMJS_VERSION 1.9.7
+    python-pip \
+    time \
+    vim \
+    wget \
+  && apt-get clean -y \
+  && rm -rf /var/lib/apt/lists/* \
+  && pip install awscli
 
 RUN \
-  mkdir -p /srv/var && \
-  wget -q --no-check-certificate -O /tmp/phantomjs-$PHANTOMJS_VERSION-linux-x86_64.tar.bz2 https://s3.amazonaws.com/codeship.io/checkbot/archives/phantomjs-$PHANTOMJS_VERSION-linux-x86_64.tar.bz2 && \
-  tar -xjf /tmp/phantomjs-$PHANTOMJS_VERSION-linux-x86_64.tar.bz2 -C /tmp && \
-  rm -f /tmp/phantomjs-$PHANTOMJS_VERSION-linux-x86_64.tar.bz2 && \
-  mv /tmp/phantomjs-$PHANTOMJS_VERSION-linux-x86_64/ /srv/var/phantomjs && \
-  ln -s /srv/var/phantomjs/bin/phantomjs /usr/bin/phantomjs
+  wget --output-document /tmp/phantomjs-linux-x86_64.tar.bz2 "https://s3.amazonaws.com/codeship-packages/phantomjs-${PHANTOMJS_VERSION}-linux-x86_64.tar.bz2" \
+  && tar -xaf /tmp/phantomjs-linux-x86_64.tar.bz2 --directory /tmp/ \
+  && mv "/tmp/phantomjs-${PHANTOMJS_VERSION}-linux-x86_64/bin/phantomjs" /usr/bin/phantomjs \
+  && rm -rf /tmp/phantomjs-linux-x86_64.tar.bz2 "/tmp/phantomjs-${PHANTOMJS_VERSION}-linux-x86_64"
 
-RUN pip install awscli
-
-RUN mkdir -p /app
-WORKDIR /app
-COPY Gemfile ./Gemfile
-COPY Gemfile.lock ./Gemfile.lock
-COPY vendor ./vendor
-RUN bundle install -j24
-RUN gem install parallel_tests
+COPY Gemfile Gemfile.lock vendor /app/
+RUN \
+  cd /app/ \
+  && bundle install --jobs 20 --retry 5 \
+  && gem install parallel_tests \
 
 WORKDIR /code
