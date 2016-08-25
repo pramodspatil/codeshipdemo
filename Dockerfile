@@ -29,7 +29,9 @@ RUN \
     wget \
   && apt-get clean -y \
   && rm -rf /var/lib/apt/lists/* \
-  && pip install awscli
+  && pip install awscli \
+  && npm install npm -g \
+  && npm install -g svgo
 
 RUN \
   wget --no-verbose --output-document /tmp/phantomjs-linux-x86_64.tar.bz2 "https://s3.amazonaws.com/codeship-packages/phantomjs-${PHANTOMJS_VERSION}-linux-x86_64.tar.bz2" \
