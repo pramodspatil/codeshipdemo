@@ -13,9 +13,11 @@ RUN \
     apt-transport-https \
   && curl -s https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add - \
   && echo "deb https://deb.nodesource.com/node_${NODE_VERSION} ${DEBIAN_DISTRIBUTION} main" > /etc/apt/sources.list.d/nodesource.list \
+  && curl -s https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+  && echo "deb http://apt.postgresql.org/pub/repos/apt/ ${DEBIAN_DISTRIBUTION}-pgdg main" >  /etc/apt/sources.list.d/postgresql.list \
   && apt-get update \
   && apt-get install -y --no-install-recommends \
-    postgresql-client-9.4 \
+    postgresql-client-9.5 \
     apt-utils \
     build-essential \
     bzip2 \
