@@ -21,18 +21,18 @@ module SiteSettingExtension
   end
 
   def types
-    @types ||= Enum.new(:string,
-                        :time,
-                        :fixnum,
-                        :float,
-                        :bool,
-                        :null,
-                        :enum,
-                        :list,
-                        :url_list,
-                        :host_list,
-                        :category_list,
-                        :value_list)
+    @types ||= Enum.new(string: 1,
+                        time: 2,
+                        fixnum: 3,
+                        float: 4,
+                        bool: 5,
+                        null: 6,
+                        enum: 7,
+                        list: 8,
+                        url_list: 9,
+                        host_list: 10,
+                        category_list: 11,
+                        value_list: 12)
   end
 
   def mutex
@@ -117,13 +117,14 @@ module SiteSettingExtension
         hidden_settings << name
       end
 
-      # You can "shadow" a site setting with a GlobalSetting. If the GlobalSetting
-      # exists it will be used instead of the setting and the setting will be hidden.
-      # Useful for things like API keys on multisite.
       if opts[:shadowed_by_global] && GlobalSetting.respond_to?(name)
-        hidden_settings << name
-        shadowed_settings << name
-        current_value = GlobalSetting.send(name)
+        val = GlobalSetting.send(name)
+
+        unless val.nil? || (val == ''.freeze)
+          hidden_settings << name
+          shadowed_settings << name
+          current_value = val
+        end
       end
 
       if opts[:refresh]
@@ -149,7 +150,7 @@ module SiteSettingExtension
   # just like a setting, except that it is available in javascript via DiscourseSession
   def client_setting(name, default = nil, opts = {})
     setting(name, default, opts)
-    client_settings << name
+    client_settings << name.to_sym
   end
 
   def settings_hash
@@ -368,10 +369,15 @@ module SiteSettingExtension
     end
   end
 
+  def set_and_log(name, value, user=Discourse.system_user)
+    prev_value = send(name)
+    set(name, value)
+    StaffActionLogger.new(user).log_site_setting_change(name, prev_value, value) if has_setting?(name)
+  end
+
   protected
 
   def clear_cache!
-    SiteText.text_for_cache.clear
     Rails.cache.delete(SiteSettingExtension.client_settings_cache_key)
     Site.clear_anon_cache!
   end
@@ -445,6 +451,28 @@ module SiteSettingExtension
     @validator_mapping[type_name]
   end
 
+  DEPRECATED_SETTINGS = [
+    ['use_https', 'force_https', '1.7']
+  ]
+
+  def setup_deprecated_methods
+    DEPRECATED_SETTINGS.each do |old_setting, new_setting, version|
+      define_singleton_method old_setting do
+        logger.warn("`SiteSetting.#{old_setting}` has been deprecated and will be removed in the #{version} Release. Please use `SiteSetting.#{new_setting}` instead")
+        self.public_send new_setting
+      end
+
+      define_singleton_method "#{old_setting}?" do
+        logger.warn("`SiteSetting.#{old_setting}?` has been deprecated and will be removed in the #{version} Release. Please use `SiteSetting.#{new_setting}?` instead")
+        self.public_send "#{new_setting}?"
+      end
+
+      define_singleton_method "#{old_setting}=" do |val|
+        logger.warn("`SiteSetting.#{old_setting}=` has been deprecated and will be removed in the #{version} Release. Please use `SiteSetting.#{new_setting}=` instead")
+        self.public_send "#{new_setting}=", val
+      end
+    end
+  end
 
   def setup_methods(name)
     clean_name = name.to_s.sub("?", "").to_sym
@@ -478,6 +506,12 @@ module SiteSettingExtension
       url = URI.parse(url).host
     end
     url
+  end
+
+  private
+
+  def logger
+    Rails.logger
   end
 
 end

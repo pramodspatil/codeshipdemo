@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 require 'post_revisor'
 
 describe PostRevisor do
@@ -8,7 +8,6 @@ describe PostRevisor do
   let(:post_args) { { user: newuser, topic: topic } }
 
   context 'TopicChanges' do
-    let(:topic) { Fabricate(:topic) }
     let(:tc) {
       topic.reload
       PostRevisor::TopicChanges.new(topic, topic.user)
@@ -74,7 +73,7 @@ describe PostRevisor do
 
     describe 'ninja editing' do
       it 'correctly applies edits' do
-        SiteSetting.stubs(:ninja_edit_window).returns(1.minute)
+        SiteSetting.stubs(:editing_grace_period).returns(1.minute)
 
         subject.revise!(post.user, { raw: 'updated body' }, revised_at: post.updated_at + 10.seconds)
         post.reload
@@ -87,12 +86,12 @@ describe PostRevisor do
       end
 
       it "doesn't create a new version" do
-        SiteSetting.stubs(:ninja_edit_window).returns(1.minute)
+        SiteSetting.stubs(:editing_grace_period).returns(1.minute)
 
         # making a revision
-        subject.revise!(post.user, { raw: 'updated body' }, revised_at: post.updated_at + SiteSetting.ninja_edit_window + 1.seconds)
+        subject.revise!(post.user, { raw: 'updated body' }, revised_at: post.updated_at + SiteSetting.editing_grace_period + 1.seconds)
         # "roll back"
-        subject.revise!(post.user, { raw: 'Hello world' }, revised_at: post.updated_at + SiteSetting.ninja_edit_window + 2.seconds)
+        subject.revise!(post.user, { raw: 'Hello world' }, revised_at: post.updated_at + SiteSetting.editing_grace_period + 2.seconds)
 
         post.reload
 
@@ -107,7 +106,7 @@ describe PostRevisor do
       let!(:revised_at) { post.updated_at + 2.minutes }
 
       before do
-        SiteSetting.stubs(:ninja_edit_window).returns(1.minute.to_i)
+        SiteSetting.stubs(:editing_grace_period).returns(1.minute.to_i)
         subject.revise!(post.user, { raw: 'updated body' }, revised_at: revised_at)
         post.reload
       end
@@ -278,14 +277,14 @@ describe PostRevisor do
 
     describe 'with a new body' do
       let(:changed_by) { Fabricate(:coding_horror) }
-      let!(:result) { subject.revise!(changed_by, { raw: "lets update the body" }) }
+      let!(:result) { subject.revise!(changed_by, { raw: "lets update the body. Здравствуйте" }) }
 
       it 'returns true' do
         expect(result).to eq(true)
       end
 
       it 'updates the body' do
-        expect(post.raw).to eq("lets update the body")
+        expect(post.raw).to eq("lets update the body. Здравствуйте")
       end
 
       it 'sets the invalidate oneboxes attribute' do
@@ -306,19 +305,33 @@ describe PostRevisor do
       end
 
       it "updates the word count" do
-        expect(post.word_count).to eq(4)
+        expect(post.word_count).to eq(5)
         post.topic.reload
-        expect(post.topic.word_count).to eq(4)
+        expect(post.topic.word_count).to eq(5)
       end
 
       context 'second poster posts again quickly' do
         before do
-          SiteSetting.stubs(:ninja_edit_window).returns(1.minute.to_i)
+          SiteSetting.stubs(:editing_grace_period).returns(1.minute.to_i)
           subject.revise!(changed_by, { raw: 'yet another updated body' }, revised_at: post.updated_at + 10.seconds)
           post.reload
         end
 
         it 'is a ninja edit, because the second poster posted again quickly' do
+          expect(post.version).to eq(2)
+          expect(post.public_version).to eq(2)
+          expect(post.revisions.size).to eq(1)
+        end
+      end
+
+      context 'passing skip_revision as true' do
+        before do
+          SiteSetting.stubs(:editing_grace_period).returns(1.minute.to_i)
+          subject.revise!(changed_by, { raw: 'yet another updated body' }, { revised_at: post.updated_at + 10.hours, skip_revision: true })
+          post.reload
+        end
+
+        it 'does not create new revision ' do
           expect(post.version).to eq(2)
           expect(post.public_version).to eq(2)
           expect(post.revisions.size).to eq(1)
@@ -348,5 +361,154 @@ describe PostRevisor do
       expect(post.raw).to eq("    <-- whitespaces -->")
     end
 
+    context "#publish_changes" do
+      let!(:post) { Fabricate(:post, topic_id: topic.id) }
+
+      it "should publish topic changes to clients" do
+        revisor = described_class.new(topic.ordered_posts.first, topic)
+
+        messages = MessageBus.track_publish do
+          revisor.revise!(newuser, { title: 'this is a test topic' })
+        end
+
+        message = messages.find { |m| m.channel == "/topic/#{topic.id}" }
+        payload = message.data
+        expect(payload[:reload_topic]).to eq(true)
+      end
+    end
+
+    context "tagging" do
+      context "tagging disabled" do
+        before do
+          SiteSetting.tagging_enabled = false
+        end
+
+        it "doesn't add the tags" do
+          result = subject.revise!(Fabricate(:user), { raw: "lets totally update the body", tags: ['totally', 'update'] })
+          expect(result).to eq(true)
+          post.reload
+          expect(post.topic.tags.size).to eq(0)
+        end
+      end
+
+      context "tagging enabled" do
+        before do
+          SiteSetting.tagging_enabled = true
+        end
+
+        context "can create tags" do
+          before do
+            SiteSetting.min_trust_to_create_tag = 0
+            SiteSetting.min_trust_level_to_tag_topics = 0
+          end
+
+          it "can create all tags if none exist" do
+            expect {
+              @result = subject.revise!(Fabricate(:user), { raw: "lets totally update the body", tags: ['totally', 'update'] })
+            }.to change { Tag.count }.by(2)
+            expect(@result).to eq(true)
+            post.reload
+            expect(post.topic.tags.map(&:name).sort).to eq(['totally', 'update'])
+          end
+
+          it "creates missing tags if some exist" do
+            Fabricate(:tag, name: 'totally')
+            expect {
+              @result = subject.revise!(Fabricate(:user), { raw: "lets totally update the body", tags: ['totally', 'update'] })
+            }.to change { Tag.count }.by(1)
+            expect(@result).to eq(true)
+            post.reload
+            expect(post.topic.tags.map(&:name).sort).to eq(['totally', 'update'])
+          end
+
+          it "can remove all tags" do
+            topic.tags = [Fabricate(:tag, name: "super"), Fabricate(:tag, name: "stuff")]
+            result = subject.revise!(Fabricate(:user), { raw: "lets totally update the body", tags: [] })
+            expect(result).to eq(true)
+            post.reload
+            expect(post.topic.tags.size).to eq(0)
+          end
+
+          it "can remove all tags using tags_empty_array" do
+            topic.tags = [Fabricate(:tag, name: "stuff")]
+            result = subject.revise!(Fabricate(:user), { raw: "lets totally update the body", tags_empty_array: "true" })
+            expect(result).to eq(true)
+            post.reload
+            expect(post.topic.tags.size).to eq(0)
+          end
+
+          it "can't add staff-only tags" do
+            SiteSetting.staff_tags = "important"
+            result = subject.revise!(Fabricate(:user), { raw: "lets totally update the body", tags: ['important', 'stuff'] })
+            expect(result).to eq(false)
+            expect(post.topic.errors.present?).to eq(true)
+          end
+
+          it "staff can add staff-only tags" do
+            SiteSetting.staff_tags = "important"
+            result = subject.revise!(Fabricate(:admin), { raw: "lets totally update the body", tags: ['important', 'stuff'] })
+            expect(result).to eq(true)
+            post.reload
+            expect(post.topic.tags.map(&:name).sort).to eq(['important', 'stuff'])
+          end
+
+          context "with staff-only tags" do
+            before do
+              SiteSetting.staff_tags = "important"
+              topic = post.topic
+              topic.tags = [Fabricate(:tag, name: "super"), Fabricate(:tag, name: "important"), Fabricate(:tag, name: "stuff")]
+            end
+
+            it "staff-only tags can't be removed" do
+              result = subject.revise!(Fabricate(:user), { raw: "lets totally update the body", tags: ['stuff'] })
+              expect(result).to eq(false)
+              expect(post.topic.errors.present?).to eq(true)
+              post.reload
+              expect(post.topic.tags.map(&:name).sort).to eq(['important', 'stuff', 'super'])
+            end
+
+            it "can't remove all tags if some are staff-only" do
+              result = subject.revise!(Fabricate(:user), { raw: "lets totally update the body", tags: [] })
+              expect(result).to eq(false)
+              expect(post.topic.errors.present?).to eq(true)
+              post.reload
+              expect(post.topic.tags.map(&:name).sort).to eq(['important', 'stuff', 'super'])
+            end
+
+            it "staff-only tags can be removed by staff" do
+              result = subject.revise!(Fabricate(:admin), { raw: "lets totally update the body", tags: ['stuff'] })
+              expect(result).to eq(true)
+              post.reload
+              expect(post.topic.tags.map(&:name)).to eq(['stuff'])
+            end
+
+            it "staff can remove all tags" do
+              result = subject.revise!(Fabricate(:admin), { raw: "lets totally update the body", tags: [] })
+              expect(result).to eq(true)
+              post.reload
+              expect(post.topic.tags.size).to eq(0)
+            end
+          end
+
+        end
+
+        context "cannot create tags" do
+          before do
+            SiteSetting.min_trust_to_create_tag = 4
+            SiteSetting.min_trust_level_to_tag_topics = 0
+          end
+
+          it "only uses existing tags" do
+            Fabricate(:tag, name: 'totally')
+            expect {
+              @result = subject.revise!(Fabricate(:user), { raw: "lets totally update the body", tags: ['totally', 'update'] })
+            }.to_not change { Tag.count }
+            expect(@result).to eq(true)
+            post.reload
+            expect(post.topic.tags.map(&:name)).to eq(['totally'])
+          end
+        end
+      end
+    end
   end
 end

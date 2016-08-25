@@ -4,10 +4,13 @@
 @import "./common/foundation/variables";
 @import "./common/foundation/colors";
 @import "./common/foundation/mixins";
-@import "./common/base/onebox";
 
 article.post {
   border-bottom: 1px solid #ddd;
+
+  img.avatar {
+    border-radius: 50%;
+  }
 
   &.deleted {
     background-color: #ffe5e5;
@@ -29,7 +32,6 @@ article.post {
     margin: 0 0 10px 0;
     background-color: dark-light-diff($primary, $secondary, 97%, -45%);
     border-left: 5px solid darken(dark-light-diff($primary, $secondary, 97%, -45%), 10%);
-    overflow: hidden;
     p {
       margin: 0 0 10px 0;
     }
@@ -139,4 +141,22 @@ footer {
 .logo {
   float: right;
   max-height: 30px;
+}
+
+// load onebox CSS at the end
+@import "./common/base/onebox";
+
+// we apparently use bottom margins on paras in the embed CSS, leading to weirdness
+// which we will now clean up
+aside.onebox {
+  margin-bottom: 20px;
+  p {
+    margin-bottom: 0 !important;
+  }
+}
+
+// images large enough for the lightbox wrapper don't have bottom margins
+// either, unless we add one now
+div.lightbox-wrapper {
+  margin-bottom: 20px;
 }

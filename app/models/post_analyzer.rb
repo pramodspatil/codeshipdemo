@@ -5,6 +5,11 @@ class PostAnalyzer
   def initialize(raw, topic_id)
     @raw  = raw
     @topic_id = topic_id
+    @found_oneboxes = false
+  end
+
+  def found_oneboxes?
+    @found_oneboxes
   end
 
   # What we use to cook posts
@@ -12,6 +17,7 @@ class PostAnalyzer
     cooked = PrettyText.cook(*args)
 
     result = Oneboxer.apply(cooked, topic_id: @topic_id) do |url, _|
+      @found_oneboxes = true
       Oneboxer.invalidate(url) if args.last[:invalidate_oneboxes]
       Oneboxer.cached_onebox url
     end
@@ -52,8 +58,17 @@ class PostAnalyzer
     cooked_stripped.css("code").remove
     cooked_stripped.css(".onebox").remove
 
-    results = cooked_stripped.to_html.scan(PrettyText.mention_matcher)
-    @raw_mentions = results.uniq.map { |un| un.first.downcase.gsub!(/^@/, '') }
+    raw_mentions = cooked_stripped.css('.mention, .mention-group').map do |e|
+       if name = e.inner_text
+         name = name[1..-1]
+         name.downcase! if name
+         name
+       end
+    end
+
+    raw_mentions.compact!
+    raw_mentions.uniq!
+    @raw_mention = raw_mentions
   end
 
   # from rack ... compat with ruby 2.2

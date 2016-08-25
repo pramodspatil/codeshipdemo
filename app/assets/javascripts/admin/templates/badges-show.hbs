@@ -2,94 +2,102 @@
   <form class="form-horizontal">
     <div>
       <label for="name">{{i18n 'admin.badges.name'}}</label>
-      {{input type="text" name="name" value=buffered.name}}
+      {{#if readOnly}}
+        {{input type="text" name="name" value=buffered.name disabled=true}}
+      {{else}}
+        {{input type="text" name="name" value=buffered.name}}
+      {{/if}}
     </div>
 
-    {{#if showDisplayName}}
-      <div>
-        <strong>{{i18n 'admin.badges.display_name'}}</strong>
-        {{buffered.displayName}}
-      </div>
-    {{/if}}
-
     <div>
-      <label for="name">{{i18n 'admin.badges.icon'}}</label>
-      {{input type="text" name="name" value=buffered.icon}}
+      <label for="icon">{{i18n 'admin.badges.icon'}}</label>
+      {{input type="text" name="icon" value=buffered.icon}}
       <p class='help'>{{i18n 'admin.badges.icon_help'}}</p>
     </div>
 
     <div>
-      <label for="name">{{i18n 'admin.badges.image'}}</label>
-      {{input type="text" name="name" value=buffered.image}}
+      <label for="image">{{i18n 'admin.badges.image'}}</label>
+      {{input type="text" name="image" value=buffered.image}}
       <p class='help'>{{i18n 'admin.badges.icon_help'}}</p>
     </div>
 
     <div>
       <label for="badge_type_id">{{i18n 'admin.badges.badge_type'}}</label>
-      {{view "select" name="badge_type_id"
-                      value=buffered.badge_type_id
-                      content=badgeTypes
-                      optionValuePath="content.id"
-                      optionLabelPath="content.name"
-                      disabled=readOnly}}
+      {{combo-box name="badge_type_id"
+                  value=buffered.badge_type_id
+                  content=badgeTypes
+                  optionValuePath="content.id"
+                  optionLabelPath="content.name"
+                  disabled=readOnly}}
     </div>
 
     <div>
       <label for="badge_grouping_id">{{i18n 'admin.badges.badge_grouping'}}</label>
-      {{view "select" name="badge_grouping_id"
-                      value=buffered.badge_grouping_id
-                      content=badgeGroupings
-                      optionValuePath="content.id"
-                      optionLabelPath="content.name"}}
+      {{combo-box name="badge_grouping_id"
+                  value=buffered.badge_grouping_id
+                  content=badgeGroupings
+                  optionValuePath="content.id"
+                  optionLabelPath="content.displayName"}}
       &nbsp;<button {{action "editGroupings"}} class='btn'>{{fa-icon 'pencil'}}</button>
     </div>
 
 
     <div>
       <label for="description">{{i18n 'admin.badges.description'}}</label>
-      {{#if canEditDescription}}
-        {{textarea name="description" value=buffered.description}}
+      {{#if buffered.system}}
+        {{textarea name="description" value=buffered.description disabled=true}}
       {{else}}
-        {{textarea name="description" value=buffered.displayDescription disabled=true}}
+        {{textarea name="description" value=buffered.description}}
       {{/if}}
     </div>
 
     <div>
-      <label for="query">{{i18n 'admin.badges.query'}}</label>
-      {{textarea name="query" value=buffered.query disabled=readOnly}}
+      <label for="long_description">{{i18n 'admin.badges.long_description'}}</label>
+      {{#if buffered.system}}
+        {{textarea name="long_description" value=buffered.long_description disabled=true}}
+      {{else}}
+        {{textarea name="long_description" value=buffered.long_description}}
+      {{/if}}
     </div>
 
-    {{#if hasQuery}}
-      <a href {{action "preview" buffered "false"}}>{{i18n 'admin.badges.preview.link_text'}}</a>
-      |
-      <a href {{action "preview" buffered "true"}}>{{i18n 'admin.badges.preview.plan_text'}}</a>
-      {{#if preview_loading}}
-        {{i18n 'loading'}}...
+    {{#if siteSettings.enable_badge_sql}}
+      <div>
+        <label for="query">{{i18n 'admin.badges.query'}}</label>
+        {{textarea name="query" value=buffered.query disabled=readOnly}}
+      </div>
+
+      {{#if hasQuery}}
+        <a href {{action "preview" buffered "false"}}>{{i18n 'admin.badges.preview.link_text'}}</a>
+        |
+        <a href {{action "preview" buffered "true"}}>{{i18n 'admin.badges.preview.plan_text'}}</a>
+        {{#if preview_loading}}
+          {{i18n 'loading'}}...
+        {{/if}}
+
+        <div>
+          <label>
+            {{input type="checkbox" checked=buffered.auto_revoke disabled=readOnly}}
+            {{i18n 'admin.badges.auto_revoke'}}
+          </label>
+        </div>
+
+        <div>
+          <label>
+            {{input type="checkbox" checked=buffered.target_posts disabled=readOnly}}
+            {{i18n 'admin.badges.target_posts'}}
+          </label>
+        </div>
+
+        <div>
+          <label for="trigger">{{i18n 'admin.badges.trigger'}}</label>
+          {{combo-box name="trigger"
+                      value=buffered.trigger
+                      content=badgeTriggers
+                      optionValuePath="content.id"
+                      optionLabelPath="content.name"
+                      disabled=readOnly}}
+        </div>
       {{/if}}
-
-      <div>
-        <label>
-          {{input type="checkbox" checked=buffered.auto_revoke disabled=readOnly}}
-          {{i18n 'admin.badges.auto_revoke'}}
-        </label>
-      </div>
-
-      <div>
-        <label>
-          {{input type="checkbox" checked=buffered.target_posts disabled=readOnly}}
-          {{i18n 'admin.badges.target_posts'}}
-        </label>
-      </div>
-
-      <div>
-        <label for="trigger">{{i18n 'admin.badges.trigger'}}</label>
-        {{view "select" name="trigger"
-                        value=buffered.trigger
-                        content=badgeTriggers
-                        optionValuePath="content.id"
-                        optionLabelPath="content.name"
-                        disabled=readOnly}}
-      </div>
     {{/if}}
 
     <div>
@@ -128,7 +136,7 @@
     </div>
 
     <div class='buttons'>
-      <button {{action "save"}} {{bind-attr disabled=saving}} class='btn btn-primary'>{{i18n 'admin.badges.save'}}</button>
+      <button {{action "save"}} disabled={{saving}} class='btn btn-primary'>{{i18n 'admin.badges.save'}}</button>
       <span class='saving'>{{savingStatus}}</span>
       {{#unless readOnly}}
         <a {{action "destroy"}} class='delete-link'>{{i18n 'admin.badges.delete'}}</a>

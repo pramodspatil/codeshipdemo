@@ -1,5 +1,9 @@
 import { filterQueryParams, findTopicList } from 'discourse/routes/build-topic-route';
 import { queryParams } from 'discourse/controllers/discovery-sortable';
+import TopicList from 'discourse/models/topic-list';
+import PermissionType from 'discourse/models/permission-type';
+import CategoryList from 'discourse/models/category-list';
+import Category from 'discourse/models/category';
 
 // A helper function to create a category route with parameters
 export default (filter, params) => {
@@ -7,7 +11,19 @@ export default (filter, params) => {
     queryParams,
 
     model(modelParams) {
-      return { category: Discourse.Category.findBySlug(modelParams.slug, modelParams.parentSlug) };
+      const category = Category.findBySlug(modelParams.slug, modelParams.parentSlug);
+      if (!category) {
+        return Category.reloadBySlug(modelParams.slug, modelParams.parentSlug).then((atts) => {
+          if (modelParams.parentSlug) {
+            atts.category.parentCategory = Category.findBySlug(modelParams.parentSlug);
+          }
+          const record = this.store.createRecord('category', atts.category);
+          record.setupGroupsAndPermissions();
+          this.site.updateCategory(record);
+          return { category: Category.findBySlug(modelParams.slug, modelParams.parentSlug) };
+        });
+      };
+      return { category };
     },
 
     afterModel(model, transition) {
@@ -36,8 +52,7 @@ export default (filter, params) => {
     _createSubcategoryList(category) {
       this._categoryList = null;
       if (Em.isNone(category.get('parentCategory')) && Discourse.SiteSettings.show_subcategory_list) {
-        return Discourse.CategoryList.listForParent(this.store, category)
-                                     .then(list => this._categoryList = list);
+        return CategoryList.listForParent(this.store, category).then(list => this._categoryList = list);
       }
 
       // If we're not loading a subcategory list just resolve
@@ -50,14 +65,17 @@ export default (filter, params) => {
              extras = { cached: this.isPoppedState(transition) };
 
       return findTopicList(this.store, this.topicTrackingState, listFilter, findOpts, extras).then(list => {
-        Discourse.TopicList.hideUniformCategory(list, category);
+        TopicList.hideUniformCategory(list, category);
         this.set('topics', list);
+        if (list.topic_list.tags) {
+          Discourse.Site.currentProp('top_tags', list.topic_list.tags);
+        }
         return list;
       });
     },
 
     titleToken() {
-      const filterText = I18n.t('filters.' + filter.replace('/', '.') + '.title', { count: 0 }),
+      const filterText = I18n.t('filters.' + filter.replace('/', '.') + '.title'),
             category = this.currentModel.category;
 
       return I18n.t('filters.with_category', { filter: filterText, category: category.get('name') });
@@ -67,7 +85,7 @@ export default (filter, params) => {
       const topics = this.get('topics'),
             category = model.category,
             canCreateTopic = topics.get('can_create_topic'),
-            canCreateTopicOnCategory = category.get('permission') === Discourse.PermissionType.FULL;
+            canCreateTopicOnCategory = category.get('permission') === PermissionType.FULL;
 
       this.controllerFor('navigation/category').setProperties({
         canCreateTopicOnCategory: canCreateTopicOnCategory,

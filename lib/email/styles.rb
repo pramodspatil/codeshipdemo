@@ -6,6 +6,10 @@ module Email
   class Styles
     @@plugin_callbacks = []
 
+    attr_accessor :fragment
+
+    delegate :css, to: :fragment
+
     def initialize(html, opts=nil)
       @html = html
       @opts = opts || {}
@@ -33,7 +37,7 @@ module Email
       @fragment.css('img').each do |img|
         next if img['class'] == 'site-logo'
 
-        if img['class'] == "emoji" || img['src'] =~ /plugins\/emoji/
+        if img['class'] == "emoji" || img['src'] =~ /(plugins|images)\/emoji/
           img['width'] = 20
           img['height'] = 20
         else
@@ -78,7 +82,7 @@ module Email
     end
 
     def format_notification
-      style('.previous-discussion', 'font-size: 17px; color: #444;')
+      style('.previous-discussion', 'font-size: 17px; color: #444; margin-bottom:10px;')
       style('.notification-date', "text-align:right;color:#999999;padding-right:5px;font-family:'lucida grande',tahoma,verdana,arial,sans-serif;font-size:11px")
       style('.username', "font-size:13px;font-family:'lucida grande',tahoma,verdana,arial,sans-serif;color:#3b5998;text-decoration:none;font-weight:bold")
       style('.user-title', "font-size:13px;font-family:'lucida grande',tahoma,verdana,arial,sans-serif;text-decoration:none;margin-left:7px;color: #999;")
@@ -89,6 +93,8 @@ module Email
       style('hr', 'background-color: #ddd; height: 1px; border: 1px;')
       style('.rtl', 'direction: rtl;')
       style('td.body', 'padding-top:5px;', colspan: "2")
+      style('.whisper td.body', 'font-style: italic; color: #9c9c9c;')
+      style('.lightbox-wrapper .meta', 'display: none')
       correct_first_body_margin
       correct_footer_style
       reset_tables
@@ -126,8 +132,8 @@ module Email
           src_uri = URI(i['src'])
 
           # If an iframe is protocol relative, use SSL when displaying it
-          display_src = "#{src_uri.scheme || 'https://'}#{src_uri.host}#{src_uri.path}"
-          i.replace "<p><a href='#{src_uri.to_s}'>#{display_src}</a><p>"
+          display_src = "#{src_uri.scheme || 'https'}://#{src_uri.host}#{src_uri.path}#{src_uri.query.nil? ? '' : '?' + src_uri.query}#{src_uri.fragment.nil? ? '' : '#' + src_uri.fragment}"
+          i.replace "<p><a href='#{src_uri.to_s}'>#{CGI.escapeHTML(display_src)}</a><p>"
         rescue URI::InvalidURIError
           # If the URL is weird, remove it
           i.remove
@@ -136,6 +142,7 @@ module Email
     end
 
     def format_html
+      style('h4', 'color: #222;')
       style('h3', 'margin: 15px 0 20px 0;')
       style('hr', 'background-color: #ddd; height: 1px; border: 1px;')
       style('a', 'text-decoration: none; font-weight: bold; color: #006699;')
@@ -184,6 +191,17 @@ module Email
       @fragment.to_s
     end
 
+    def make_all_links_absolute
+      site_uri = URI(Discourse.base_url)
+      @fragment.css("a").each do |link|
+        begin
+          link["href"] = "#{site_uri}#{link['href']}" unless URI(link["href"].to_s).host.present?
+        rescue URI::InvalidURIError, URI::InvalidComponentError
+          # leave it
+        end
+      end
+    end
+
     private
 
     def replace_relative_urls
@@ -206,11 +224,20 @@ module Email
     end
 
     def correct_footer_style
+      footernum = 0
       @fragment.css('.footer').each do |element|
         element['style'] = "color:#666;"
+        linknum = 0
         element.css('a').each do |inner|
-          inner['style'] = "color:#666;"
+          # we want the first footer link to be specially highlighted as IMPORTANT
+          if footernum == 0 and linknum == 0
+            inner['style'] = "background-color: #006699; color:#ffffff; border-top: 4px solid #006699; border-right: 6px solid #006699; border-bottom: 4px solid #006699; border-left: 6px solid #006699; display: inline-block;"
+          else
+            inner['style'] = "color:#666;"
+          end
+          linknum += 1
         end
+        footernum += 1
       end
     end
 

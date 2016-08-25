@@ -77,6 +77,7 @@
   td {
     padding: 7px 0;
     color: dark-light-choose(scale-color($primary, $lightness: 50%), scale-color($secondary, $lightness: 50%));
+    max-width: 300px;
   }
 
   a.title {color: $primary;}
@@ -378,7 +379,7 @@ ol.category-breadcrumb {
   .btn-default.pull-right { margin-right: 10px; }
 }
 
-.category-notification-menu {
+.category-notification-menu, .tags-admin-menu {
   display: none;
 }
 
@@ -404,6 +405,7 @@ td .main-link {
   display: inline-block;
   a.title {
     padding: 5px 10px 5px 0;
+    word-wrap: break-word;
   }
 }
 .topic-list {
@@ -416,4 +418,8 @@ td .main-link {
     padding-right: 0;
     width: 120%;
   }
+}
+
+.category-list-item .category-description {
+  display: none;
 }

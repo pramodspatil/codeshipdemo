@@ -54,7 +54,8 @@ const controllerOpts = {
       this.set('controllers.discovery.loading', true);
 
       this.store.findFiltered('topicList', {filter}).then(list => {
-        Discourse.TopicList.hideUniformCategory(list, this.get('category'));
+        const TopicList = require('discourse/models/topic-list').default;
+        TopicList.hideUniformCategory(list, this.get('category'));
 
         this.setProperties({ model: list });
         this.resetSelected();
@@ -137,14 +138,11 @@ const controllerOpts = {
     return I18n.t("topics.none.educate." + split[0], {
       userPrefsUrl: Discourse.getURL("/users/") + (Discourse.User.currentProp("username_lower")) + "/preferences"
     });
-  }.property('allLoaded', 'model.topics.length'),
+  }.property('allLoaded', 'model.topics.length')
 
-  loadMoreTopics() {
-    return this.get('model').loadMore();
-  }
 };
 
-Ember.keys(queryParams).forEach(function(p) {
+Object.keys(queryParams).forEach(function(p) {
   // If we don't have a default value, initialize it to null
   if (typeof controllerOpts[p] === 'undefined') {
     controllerOpts[p] = null;

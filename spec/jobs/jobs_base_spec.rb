@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 require_dependency 'jobs/base'
 
 describe Jobs::Base do
@@ -32,7 +32,7 @@ describe Jobs::Base do
     Discourse.expects(:handle_job_exception).times(3)
 
     bad = BadJob.new
-    expect{bad.perform({})}.to raise_error
+    expect{bad.perform({})}.to raise_error(Jobs::HandledExceptionWrapper)
     expect(bad.fail_count).to eq(3)
   end
 

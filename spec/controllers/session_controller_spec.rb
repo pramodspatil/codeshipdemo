@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe SessionController do
 
@@ -210,7 +210,7 @@ describe SessionController do
         end
 
         it 'sends an activation email' do
-          Jobs.expects(:enqueue).with(:user_email, has_entries(type: :signup))
+          Jobs.expects(:enqueue).with(:critical_user_email, has_entries(type: :signup))
           sso = get_sso('/a/')
           sso.external_id = '666' # the number of the beast
           sso.email = 'bob@bob.com'
@@ -407,10 +407,16 @@ describe SessionController do
 
       describe 'suspended user' do
         it 'should return an error' do
-          User.any_instance.stubs(:suspended?).returns(true)
-          User.any_instance.stubs(:suspended_till).returns(2.days.from_now)
+          user.suspended_till = 2.days.from_now
+          user.suspended_at = Time.now
+          user.save!
+          StaffActionLogger.new(user).log_user_suspend(user, "<strike>banned</strike>")
           xhr :post, :create, login: user.username, password: 'myawesomepassword'
-          expect(::JSON.parse(response.body)['error']).to be_present
+
+          error = ::JSON.parse(response.body)['error']
+          expect(error).to be_present
+          expect(error).to match(/banned/)
+          expect(error).not_to match(/<strike>/)
         end
       end
 
@@ -632,7 +638,7 @@ describe SessionController do
       end
 
       it "enqueues an email" do
-        Jobs.expects(:enqueue).with(:user_email, has_entries(type: :forgot_password, user_id: user.id))
+        Jobs.expects(:enqueue).with(:critical_user_email, has_entries(type: :forgot_password, user_id: user.id))
         xhr :post, :forgot_password, login: user.username
       end
     end

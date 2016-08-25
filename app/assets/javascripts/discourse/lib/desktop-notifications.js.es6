@@ -1,6 +1,6 @@
 import DiscourseURL from 'discourse/lib/url';
-import PageTracker from 'discourse/lib/page-tracker';
 import KeyValueStore from 'discourse/lib/key-value-store';
+import { onPageChange } from 'discourse/lib/page-tracker';
 
 let primaryTab = false;
 let liveEnabled = false;
@@ -11,7 +11,8 @@ let lastAction = -1;
 const focusTrackerKey = "focus-tracker";
 const idleThresholdTime = 1000 * 10; // 10 seconds
 
-const keyValueStore = new KeyValueStore("discourse_desktop_notifications_");
+const context = "discourse_desktop_notifications_";
+const keyValueStore = new KeyValueStore(context);
 
 // Called from an initializer
 function init(messageBus) {
@@ -60,7 +61,7 @@ function setupNotifications() {
   window.addEventListener("storage", function(e) {
     // note: This event only fires when other tabs setItem()
     const key = e.key;
-    if (key !== focusTrackerKey) {
+    if (key !== `${context}${focusTrackerKey}`) {
       return true;
     }
     primaryTab = false;
@@ -83,7 +84,8 @@ function setupNotifications() {
   if (document) {
     document.addEventListener("scroll", resetIdle);
   }
-  PageTracker.on("change", resetIdle);
+
+  onPageChange(resetIdle);
 }
 
 function resetIdle() {
@@ -157,6 +159,12 @@ function i18nKey(notification_type) {
   return "notifications.popup." + Discourse.Site.current().get("notificationLookup")[notification_type];
 }
 
-// Exported for controllers/notification.js.es6
+function alertChannel(user) {
+  return `/notification-alert/${user.get('id')}`;
+}
 
-export { init, onNotification };
+function unsubscribe(bus, user) {
+  bus.unsubscribe(alertChannel(user));
+}
+
+export { context, init, onNotification, unsubscribe, alertChannel };

@@ -15,13 +15,23 @@ module ApplicationHelper
   include ConfigurableUrls
   include GlobalPath
 
-  def ga_universal_json
-    cookie_domain = SiteSetting.ga_universal_domain_name.gsub(/^http(s)?:\/\//, '')
-    result = {cookieDomain: cookie_domain}
+  def google_universal_analytics_json(ua_domain_name=nil)
+    result = {}
+    if ua_domain_name
+      result[:cookieDomain] = ua_domain_name.gsub(/^http(s)?:\/\//, '')
+    end
     if current_user.present?
       result[:userId] = current_user.id
     end
     result.to_json.html_safe
+  end
+
+  def ga_universal_json
+    google_universal_analytics_json(SiteSetting.ga_universal_domain_name)
+  end
+
+  def google_tag_manager_json
+    google_universal_analytics_json
   end
 
   def shared_session_key
@@ -38,7 +48,7 @@ module ApplicationHelper
   def script(*args)
     if SiteSetting.enable_cdn_js_debugging && GlobalSetting.cdn_url
       tags = javascript_include_tag(*args, "crossorigin" => "anonymous")
-      tags.gsub!("/assets/", "/cdn_asset/#{Discourse.current_hostname.gsub(".","_")}/")
+      tags.gsub!("/assets/", "/cdn_asset/#{Discourse.current_hostname.tr(".","_")}/")
       tags.gsub!(".js\"", ".js?v=1&origin=#{CGI.escape request.base_url}\"")
       tags.html_safe
     else
@@ -59,8 +69,14 @@ module ApplicationHelper
     "#{mobile_view? ? 'mobile-view' : 'desktop-view'} #{mobile_device? ? 'mobile-device' : 'not-mobile-device'} #{rtl_class} #{current_user ? '' : 'anon'}"
   end
 
+  def body_classes
+    if @category && @category.url.present?
+      "category-#{@category.url.sub(/^\/c\//, '').gsub(/\//, '-')}"
+    end
+  end
+
   def rtl_class
-    RTL.new(current_user).css_class
+    rtl? ? 'rtl' : ''
   end
 
   def escape_unicode(javascript)
@@ -74,8 +90,9 @@ module ApplicationHelper
     end
   end
 
-  def unescape_emoji(title)
+  def format_topic_title(title)
     PrettyText.unescape_emoji(title)
+    strip_tags(title)
   end
 
   def with_format(format, &block)
@@ -111,7 +128,7 @@ module ApplicationHelper
   end
 
   def rtl?
-    ["ar", "fa_IR", "he"].include?(user_locale)
+    ["ar", "fa_IR", "he"].include? I18n.locale.to_s
   end
 
   def user_locale
@@ -125,7 +142,13 @@ module ApplicationHelper
     opts ||= {}
     opts[:url] ||= "#{Discourse.base_url_no_prefix}#{request.fullpath}"
 
-    # Use the correct scheme for open graph
+    if opts[:image].blank? && SiteSetting.default_opengraph_image_url.present?
+      opts[:image] = SiteSetting.default_opengraph_image_url
+    elsif opts[:image].blank? && SiteSetting.apple_touch_icon_url.present?
+      opts[:image] = SiteSetting.apple_touch_icon_url
+    end
+
+    # Use the correct scheme for open graph image
     if opts[:image].present? && opts[:image].start_with?("//")
       uri = URI(Discourse.base_url)
       opts[:image] = "#{uri.scheme}:#{opts[:image]}"
@@ -146,19 +169,28 @@ module ApplicationHelper
       end
     end
 
+    if opts[:read_time] && opts[:read_time] > 0 && opts[:like_count] && opts[:like_count] > 0
+      result << tag(:meta, name: 'twitter:label1', value: I18n.t("reading_time"))
+      result << tag(:meta, name: 'twitter:data1', value: "#{opts[:read_time]} mins 🕑")
+      result << tag(:meta, name: 'twitter:label2', value: I18n.t("likes"))
+      result << tag(:meta, name: 'twitter:data2', value: "#{opts[:like_count]} ❤")
+    end
+
     result.join("\n")
   end
 
-  # Look up site content for a key. If the key is blank, you can supply a block and that
-  # will be rendered instead.
-  def markdown_content(key, replacements=nil)
-    result = PrettyText.cook(SiteText.text_for(key, replacements || {})).html_safe
-    if result.blank? && block_given?
-      yield
-      nil
-    else
-      result
-    end
+  def render_sitelinks_search_tag
+    json = {
+      '@context' => 'http://schema.org',
+      '@type' => 'WebSite',
+      url: Discourse.base_url,
+      potentialAction: {
+        '@type' => 'SearchAction',
+        target: "#{Discourse.base_url}/search?q={search_term_string}",
+        'query-input' => 'required name=search_term_string',
+      }
+    }
+    content_tag(:script, MultiJson.dump(json).html_safe, type: 'application/ld+json'.freeze)
   end
 
   def application_logo_url
@@ -171,6 +203,14 @@ module ApplicationHelper
 
   def mobile_view?
     MobileDetection.resolve_mobile_view!(request.user_agent,params,session)
+  end
+
+  def crawler_layout?
+    controller.try(:use_crawler_layout?)
+  end
+
+  def include_crawler_content?
+    crawler_layout? || !mobile_view?
   end
 
   def mobile_device?

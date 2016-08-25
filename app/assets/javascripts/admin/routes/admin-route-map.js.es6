@@ -8,9 +8,11 @@ export default {
     });
 
     this.resource('adminEmail', { path: '/email'}, function() {
-      this.route('all');
       this.route('sent');
       this.route('skipped');
+      this.route('bounced');
+      this.route('received');
+      this.route('rejected');
       this.route('previewDigest', { path: '/preview-digest' });
     });
 
@@ -22,12 +24,16 @@ export default {
       });
 
       this.resource('adminSiteText', { path: '/site_texts' }, function() {
-        this.route('edit', {path: '/:text_type'});
+        this.route('edit', { path: '/:id' });
       });
+
       this.resource('adminUserFields', { path: '/user_fields' });
       this.resource('adminEmojis', { path: '/emojis' });
       this.resource('adminPermalinks', { path: '/permalinks' });
       this.resource('adminEmbedding', { path: '/embedding' });
+      this.resource('adminCustomizeEmailTemplates', { path: '/email_templates' }, function() {
+        this.route('edit', { path: '/:id' });
+      });
     });
     this.route('api');
 
@@ -57,7 +63,7 @@ export default {
     });
 
     this.resource('adminUsers', { path: '/users' }, function() {
-      this.resource('adminUser', { path: '/:username' }, function() {
+      this.resource('adminUser', { path: '/:user_id/:username' }, function() {
         this.route('badges');
         this.route('tl3Requirements', { path: '/tl3_requirements' });
       });

@@ -46,12 +46,6 @@
   margin-left: -1px;
 }
 
-.modal-footer span.hint {
-  color: dark-light-choose(scale-color($primary, $lightness: 70%), scale-color($secondary, $lightness: 30%));
-  float: right;
-  line-height: 30px;
-}
-
 .modal-header {
   border-bottom: 1px solid dark-light-diff($primary, $secondary, 90%, -60%);
   h3 {
@@ -200,5 +194,21 @@
 .delete-flag-modal, .agree-flag-modal {
   .modal-inner-container {
     width: 400px;
+  }
+}
+
+.change-timestamp {
+  min-height: 300px;
+
+  .date-picker {
+    width: 10em;
+  }
+
+  input[type=time] {
+    width: 6em;
+  }
+
+  form {
+    margin: 0;
   }
 }

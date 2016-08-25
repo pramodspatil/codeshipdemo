@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe PostActionsController do
 
@@ -7,7 +7,7 @@ describe PostActionsController do
       expect { xhr :post, :create }.to raise_error(Discourse::NotLoggedIn)
     end
 
-    describe 'logged in' do
+    describe 'logged in as moderator' do
       before do
         @user = log_in(:moderator)
         @post = Fabricate(:post, user: Fabricate(:coding_horror))
@@ -47,6 +47,17 @@ describe PostActionsController do
       it 'passes the message through' do
         PostAction.expects(:act).once.with(@user, @post, PostActionType.types[:like], {message: 'action message goes here'})
         xhr :post, :create, id: @post.id, post_action_type_id: PostActionType.types[:like], message: 'action message goes here'
+      end
+
+      it 'passes the message through as warning' do
+        PostAction.expects(:act).once.with(@user, @post, PostActionType.types[:like], {message: 'action message goes here', is_warning: true})
+        xhr :post, :create, id: @post.id, post_action_type_id: PostActionType.types[:like], message: 'action message goes here', is_warning: true
+      end
+
+      it "doesn't create message as a warning if the user isn't staff" do
+        Guardian.any_instance.stubs(:is_staff?).returns(false)
+        PostAction.expects(:act).once.with(@user, @post, PostActionType.types[:like], {message: 'action message goes here'})
+        xhr :post, :create, id: @post.id, post_action_type_id: PostActionType.types[:like], message: 'action message goes here', is_warning: true
       end
 
       it 'passes take_action through' do

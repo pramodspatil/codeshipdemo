@@ -1,3 +1,4 @@
+require "backup_restore/utils"
 require "backup_restore/backuper"
 require "backup_restore/restorer"
 
@@ -5,7 +6,9 @@ module BackupRestore
 
   class OperationRunningError < RuntimeError; end
 
-  DUMP_FILE = "dump.sql"
+  VERSION_PREFIX = "v".freeze
+  DUMP_FILE = "dump.sql.gz".freeze
+  OLD_DUMP_FILE = "dump.sql".freeze
   METADATA_FILE = "meta.json"
   LOGS_CHANNEL = "/admin/backups/logs"
 
@@ -100,7 +103,7 @@ module BackupRestore
   DatabaseConfiguration = Struct.new(:host, :port, :username, :password, :database)
 
   def self.database_configuration
-    config = Rails.env.production? ? ActiveRecord::Base.connection_pool.spec.config : Rails.configuration.database_configuration[Rails.env]
+    config = ActiveRecord::Base.connection_pool.spec.config
     config = config.with_indifferent_access
 
     DatabaseConfiguration.new(

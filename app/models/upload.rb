@@ -14,6 +14,8 @@ class Upload < ActiveRecord::Base
 
   has_many :optimized_images, dependent: :destroy
 
+  attr_accessor :is_attachment_for_group_message
+
   validates_presence_of :filesize
   validates_presence_of :original_filename
 
@@ -27,19 +29,16 @@ class Upload < ActiveRecord::Base
     thumbnail(width, height).present?
   end
 
-  def create_thumbnail!(width, height)
+  def create_thumbnail!(width, height, crop=false)
     return unless SiteSetting.create_thumbnails?
 
-    thumbnail = OptimizedImage.create_for(
-      self,
-      width,
-      height,
+    opts = {
       filename: self.original_filename,
-      allow_animation: SiteSetting.allow_animated_thumbnails
-    )
+      allow_animation: SiteSetting.allow_animated_thumbnails,
+      crop: crop
+    }
 
-    if thumbnail
-      optimized_images << thumbnail
+    if thumbnail = OptimizedImage.create_for(self, width, height, opts)
       self.width = width
       self.height = height
       save(validate: false)
@@ -60,25 +59,55 @@ class Upload < ActiveRecord::Base
   # list of image types that will be cropped
   CROPPED_IMAGE_TYPES ||= %w{avatar profile_background card_background}
 
+  WHITELISTED_SVG_ELEMENTS ||= %w{
+    circle
+    clippath
+    defs
+    ellipse
+    g
+    line
+    linearGradient
+    path
+    polygon
+    polyline
+    radialGradient
+    rect
+    stop
+    svg
+    text
+    textpath
+    tref
+    tspan
+    use
+  }
+
+  def self.svg_whitelist_xpath
+    @@svg_whitelist_xpath ||= "//*[#{WHITELISTED_SVG_ELEMENTS.map { |e| "name()!='#{e}'" }.join(" and ") }]"
+  end
+
   # options
   #   - content_type
-  #   - origin
-  #   - image_type
+  #   - origin (url)
+  #   - image_type ("avatar", "profile_background", "card_background")
+  #   - is_attachment_for_group_message (boolean)
   def self.create_for(user_id, file, filename, filesize, options = {})
     DistributedMutex.synchronize("upload_#{user_id}_#{filename}") do
       # do some work on images
-      if FileHelper.is_image?(filename)
-        if filename =~ /\.svg$/i
-          svg = Nokogiri::XML(file).at_css("svg")
-          w = svg["width"].to_i
-          h = svg["height"].to_i
+      if FileHelper.is_image?(filename) && is_actual_image?(file)
+        if filename[/\.svg$/i]
+          # whitelist svg elements
+          doc = Nokogiri::XML(file)
+          doc.xpath(svg_whitelist_xpath).remove
+          File.write(file.path, doc.to_s)
+          file.rewind
         else
-          # fix orientation first (but not for GIFs)
-          fix_image_orientation(file.path) unless filename =~ /\.GIF$/i
-          # retrieve image info
-          image_info = FastImage.new(file) rescue nil
-          w, h = *(image_info.try(:size) || [0, 0])
+          # fix orientation first
+          fix_image_orientation(file.path) if should_optimize?(file.path)
         end
+
+        # retrieve image info
+        image_info = FastImage.new(file)
+        w, h = *(image_info.try(:size) || [0, 0])
 
         # default size
         width, height = ImageSizer.resize(w, h)
@@ -107,12 +136,12 @@ class Upload < ActiveRecord::Base
           end
         end
 
-        # optimize image
-        ImageOptim.new.optimize_image!(file.path) rescue nil
-
-        # correct size so it displays the optimized image size which is the only
-        # one that is stored
-        filesize = File.size(file.path)
+        # optimize image (except GIFs, SVGs and large PNGs)
+        if should_optimize?(file.path)
+          ImageOptim.new.optimize_image!(file.path) rescue nil
+          # update the file size
+          filesize = File.size(file.path)
+        end
       end
 
       # compute the sha of the file
@@ -122,7 +151,7 @@ class Upload < ActiveRecord::Base
       upload = find_by(sha1: sha1)
 
       # make sure the previous upload has not failed
-      if upload && upload.url.blank?
+      if upload && (upload.url.blank? || is_dimensionless_image?(filename, upload.width, upload.height))
         upload.destroy
         upload = nil
       end
@@ -141,8 +170,13 @@ class Upload < ActiveRecord::Base
       upload.height            = height
       upload.origin            = options[:origin][0...1000] if options[:origin]
 
-      if FileHelper.is_image?(filename) && (upload.width == 0 || upload.height == 0)
+      if options[:is_attachment_for_group_message]
+        upload.is_attachment_for_group_message = true
+      end
+
+      if is_dimensionless_image?(filename, upload.width, upload.height)
         upload.errors.add(:base, I18n.t("upload.images.size_not_found"))
+        return upload
       end
 
       return upload unless upload.save
@@ -162,12 +196,36 @@ class Upload < ActiveRecord::Base
     end
   end
 
+  def self.is_actual_image?(file)
+    # due to ImageMagick CVE-2016–3714, use FastImage to check the magic bytes
+    # cf. https://meta.discourse.org/t/imagemagick-cve-2016-3714/43624
+    FastImage.size(file, raise_on_failure: true)
+  rescue
+    false
+  end
+
+  LARGE_PNG_SIZE ||= 3.megabytes
+
+  def self.should_optimize?(path)
+    # don't optimize GIFs or SVGs
+    return false if path =~ /\.(gif|svg)$/i
+    return true  if path !~ /\.png$/i
+    image_info = FastImage.new(path) rescue nil
+    w, h = *(image_info.try(:size) || [0, 0])
+    # don't optimize large PNGs
+    w > 0 && h > 0 && w * h < LARGE_PNG_SIZE
+  end
+
+  def self.is_dimensionless_image?(filename, width, height)
+    FileHelper.is_image?(filename) && (width.blank? || width == 0 || height.blank? || height == 0)
+  end
+
   def self.get_from_url(url)
     return if url.blank?
     # we store relative urls, so we need to remove any host/cdn
-    url = url.sub(/^#{Discourse.asset_host}/i, "") if Discourse.asset_host.present?
+    url = url.sub(Discourse.asset_host, "") if Discourse.asset_host.present?
     # when using s3, we need to replace with the absolute base url
-    url = url.sub(/^#{SiteSetting.s3_cdn_url}/i, Discourse.store.absolute_base_url) if SiteSetting.s3_cdn_url.present?
+    url = url.sub(SiteSetting.s3_cdn_url, Discourse.store.absolute_base_url) if SiteSetting.s3_cdn_url.present?
     Upload.find_by(url: url)
   end
 
@@ -240,11 +298,11 @@ end
 #
 #  id                :integer          not null, primary key
 #  user_id           :integer          not null
-#  original_filename :string(255)      not null
+#  original_filename :string           not null
 #  filesize          :integer          not null
 #  width             :integer
 #  height            :integer
-#  url               :string(255)      not null
+#  url               :string           not null
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
 #  sha1              :string(40)

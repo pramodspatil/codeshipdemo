@@ -1,3 +1,5 @@
+import { defaultHomepage } from 'discourse/lib/utilities';
+
 export default function() {
   // Error page
   this.route('exception', { path: '/exception' });
@@ -42,32 +44,48 @@ export default function() {
     this.route('parentCategory', { path: '/c/:slug' });
     this.route('categoryNone', { path: '/c/:slug/none' });
     this.route('category', { path: '/c/:parentSlug/:slug' });
+    this.route('categoryWithID', { path: '/c/:parentSlug/:slug/:id' });
 
     // homepage
-    this.route(Discourse.Utilities.defaultHomepage(), { path: '/' });
+    this.route(defaultHomepage(), { path: '/' });
   });
 
   this.resource('group', { path: '/groups/:name' }, function() {
     this.route('members');
+    this.route('posts');
+    this.route('topics');
+    this.route('mentions');
+    this.route('messages');
   });
 
   // User routes
   this.resource('users');
   this.resource('user', { path: '/users/:username' }, function() {
+    this.route('summary');
     this.resource('userActivity', { path: '/activity' }, function() {
-      _.map(Discourse.UserAction.TYPES, (id, userAction) => {
-        this.route(userAction, { path: userAction.replace('_', '-') });
-      });
+      this.route('topics');
+      this.route('replies');
+      this.route('likesGiven', {path: 'likes-given'});
+      this.route('bookmarks');
+      this.route('pending');
+    });
+
+    this.resource('userNotifications', {path: '/notifications'}, function(){
+      this.route('responses');
+      this.route('likesReceived', { path: 'likes-received'});
+      this.route('mentions');
+      this.route('edits');
     });
 
     this.route('badges');
-    this.route('notifications');
     this.route('flaggedPosts', { path: '/flagged-posts' });
     this.route('deletedPosts', { path: '/deleted-posts' });
 
     this.resource('userPrivateMessages', { path: '/messages' }, function() {
-      this.route('mine');
-      this.route('unread');
+      this.route('sent');
+      this.route('archive');
+      this.route('group', { path: 'group/:name'});
+      this.route('groupArchive', { path: 'group/:name/archive'});
     });
 
     this.resource('preferences', function() {
@@ -81,6 +99,7 @@ export default function() {
     this.resource('userInvited', { path: '/invited' }, function() {
       this.route('show', { path: '/:filter' });
     });
+
   });
 
   this.route('signup', {path: '/signup'});
@@ -93,6 +112,7 @@ export default function() {
   this.route('guidelines', {path: '/guidelines'});
 
   this.route('new-topic', {path: '/new-topic'});
+  this.route('new-message', {path: '/new-message'});
 
   this.resource('badges', function() {
     this.route('show', {path: '/:id/:slug'});
@@ -101,4 +121,21 @@ export default function() {
   this.resource('queued-posts', { path: '/queued-posts' });
 
   this.route('full-page-search', {path: '/search'});
+
+  this.resource('tags', function() {
+    this.route('show', {path: '/:tag_id'});
+    this.route('showCategory', {path: '/c/:category/:tag_id'});
+    this.route('showParentCategory', {path: '/c/:parent_category/:category/:tag_id'});
+
+    Discourse.Site.currentProp('filters').forEach(filter => {
+      this.route('show' + filter.capitalize(), {path: '/:tag_id/l/' + filter});
+      this.route('showCategory' + filter.capitalize(), {path: '/c/:category/:tag_id/l/' + filter});
+      this.route('showParentCategory' + filter.capitalize(), {path: '/c/:parent_category/:category/:tag_id/l/' + filter});
+    });
+    this.route('show', {path: 'intersection/:tag_id/*additional_tags'});
+  });
+
+  this.resource('tagGroups', {path: '/tag_groups'}, function() {
+    this.route('show', {path: '/:id'});
+  });
 }

@@ -8,6 +8,7 @@ class EmbedController < ApplicationController
 
   def comments
     embed_url = params[:embed_url]
+    embed_username = params[:discourse_username]
 
     topic_id = nil
     if embed_url.present?
@@ -21,7 +22,8 @@ class EmbedController < ApplicationController
                                   current_user,
                                   limit: SiteSetting.embed_post_limit,
                                   exclude_first: true,
-                                  exclude_deleted_users: true)
+                                  exclude_deleted_users: true,
+                                  exclude_hidden: true)
 
       @second_post_url = "#{@topic_view.topic.url}/2" if @topic_view
       @posts_left = 0
@@ -29,8 +31,18 @@ class EmbedController < ApplicationController
         @posts_left = @topic_view.topic.posts_count - SiteSetting.embed_post_limit - 1
       end
 
+      if @topic_view
+        @reply_count = @topic_view.topic.posts_count - 1
+        @reply_count = 0 if @reply_count < 0
+      end
+
     elsif embed_url.present?
-      Jobs.enqueue(:retrieve_topic, user_id: current_user.try(:id), embed_url: embed_url)
+      Jobs.enqueue(:retrieve_topic,
+                      user_id: current_user.try(:id),
+                      embed_url: embed_url,
+                      author_username: embed_username,
+                      referer: request.env['HTTP_REFERER']
+                  )
       render 'loading'
     end
 
@@ -57,7 +69,11 @@ class EmbedController < ApplicationController
       topic_embeds.each do |te|
         url = te.embed_url
         url = "#{url}#discourse-comments" unless params[:embed_url].include?(url)
-        by_url[url] = I18n.t('embed.replies', count: te.topic.posts_count - 1)
+        if te.topic.present?
+          by_url[url] = I18n.t('embed.replies', count: te.topic.posts_count - 1)
+        else
+          by_url[url] = I18n.t('embed.replies', count: 0)
+        end
       end
     end
 
@@ -73,7 +89,7 @@ class EmbedController < ApplicationController
     def ensure_embeddable
 
       if !(Rails.env.development? && current_user.try(:admin?))
-        raise Discourse::InvalidAccess.new('invalid referer host') unless EmbeddableHost.host_allowed?(request.referer)
+        raise Discourse::InvalidAccess.new('invalid referer host') unless EmbeddableHost.url_allowed?(request.referer)
       end
 
       response.headers['X-Frame-Options'] = "ALLOWALL"

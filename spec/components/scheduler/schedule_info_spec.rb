@@ -1,5 +1,5 @@
 # encoding: utf-8
-require 'spec_helper'
+require 'rails_helper'
 require 'scheduler/scheduler'
 
 describe Scheduler::ScheduleInfo do
@@ -20,11 +20,11 @@ describe Scheduler::ScheduleInfo do
     before do
       @info = manager.schedule_info(RandomJob)
       @info.del!
-      $redis.del manager.class.queue_key
     end
 
     after do
       manager.stop!
+      $redis.del manager.class.queue_key
     end
 
     it "is a scheduled job" do
@@ -67,11 +67,11 @@ describe Scheduler::ScheduleInfo do
     before do
       @info = manager.schedule_info(DailyJob)
       @info.del!
-      $redis.del manager.class.queue_key
     end
 
     after do
       manager.stop!
+      $redis.del manager.class.queue_key
     end
 
     it "is a scheduled job" do

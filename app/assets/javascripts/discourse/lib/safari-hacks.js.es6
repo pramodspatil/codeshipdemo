@@ -6,6 +6,11 @@ function applicable() {
          !navigator.userAgent.match(/Trident/g);
 }
 
+let workaroundActive = false;
+export function isWorkaroundActive() {
+  return workaroundActive;
+}
+
 // per http://stackoverflow.com/questions/29001977/safari-in-ios8-is-scrolling-screen-when-fixed-elements-get-focus/29064810
 function positioningWorkaround($fixedElement) {
   if (!applicable()) {
@@ -37,14 +42,12 @@ function positioningWorkaround($fixedElement) {
     if (evt) {
       evt.target.removeEventListener('blur', blurred);
     }
-
-    $('body').removeData('disable-cloaked-view');
+    workaroundActive = false;
   };
 
   var blurred = _.debounce(blurredNow, 250);
 
   var positioningHack = function(evt){
-
     const self = this;
     done = false;
 
@@ -63,7 +66,6 @@ function positioningWorkaround($fixedElement) {
 
     // take care of body
 
-    $('body').data('disable-cloaked-view',true);
     $('#main-outlet').hide();
     $('header').hide();
 
@@ -71,7 +73,8 @@ function positioningWorkaround($fixedElement) {
 
     fixedElement.style.top = '0px';
 
-    fixedElement.style.height = parseInt(window.innerHeight*0.6) + "px";
+    const height = Math.max(parseInt(window.innerHeight*0.6), 350);
+    fixedElement.style.height = height + "px";
 
     // I used to do this, but it seems like we don't need to with position
     // fixed
@@ -79,6 +82,7 @@ function positioningWorkaround($fixedElement) {
 
     evt.preventDefault();
     self.focus();
+    workaroundActive = true;
   };
 
   function attachTouchStart(elem, fn) {
@@ -89,8 +93,12 @@ function positioningWorkaround($fixedElement) {
   }
 
   const checkForInputs = _.debounce(function(){
-    $fixedElement.find('button,a:not(.mobile-file-upload)').each(function(idx, elem){
+    $fixedElement.find('button:not(.hide-preview),a:not(.mobile-file-upload):not(.toggle-toolbar)').each(function(idx, elem){
       if ($(elem).parents('.autocomplete').length > 0) {
+        return;
+      }
+
+      if ($(elem).parents('.d-editor-button-bar').length > 0) {
         return;
       }
 

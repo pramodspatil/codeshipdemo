@@ -25,12 +25,13 @@
   &.bar { //bar category style
     line-height: 1.25;
     margin-right: 5px;
+    display: inline-flex;
 
     span.badge-category {
       color: $primary !important;
       padding: 3px;
       vertical-align: text-top;
-      margin-top: -3px; //vertical alignment fix
+      margin-top: -2px; //vertical alignment fix
       display: inline-block;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -38,25 +39,24 @@
       .extra-info-wrapper & {
         color: $header-primary !important;
       }
-   }
+    }
 
-   .badge-category-parent-bg, .badge-category-bg {
-     display: inline-block;
-     padding: 1px;
+    .badge-category-parent-bg, .badge-category-bg {
+      display: inline-block;
+      padding: 1px;
 
-     &:before {
-       content: "\a0";
-     }
-
-   }
-
+      &:before {
+        content: "\a0";
+      }
+    }
   }
-
 
   &.bullet { //bullet category style
     display: inline-flex;
     align-items: baseline;
-    margin-right: 10px;
+    margin-right: 5px;
+    font-size: 12px;
+    line-height: 15px;
 
     span.badge-category {
       color: $primary !important;
@@ -71,31 +71,30 @@
       .extra-info-wrapper & {
         color: $header-primary !important;
       }
-   }
+    }
 
    .badge-category-parent-bg, .badge-category-bg {
-     width: 10px;
-     height: 10px;
-     margin-right: 5px;
-     display: inline-block;
-     line-height: 1;
+    width: 10px;
+    height: 10px;
+    margin-right: 5px;
+    display: inline-block;
+    line-height: 1;
 
-     &:before {
-       content: "\a0";
-     }
-   }
+    &:before {
+      content: "\a0";
+    }
+  }
 
-   span {
-     &.badge-category-parent-bg { //subcategory style
-       width: 5px;
-       margin-right: 0;
-       & + .badge-category-bg {
-         width: 5px;
-       }
-     }
-   }
-
- }
+  span {
+      &.badge-category-parent-bg { //subcategory style
+        width: 5px;
+        margin-right: 0;
+        & + .badge-category-bg {
+          width: 5px;
+        }
+      }
+    }
+  }
 
 
   &.box {  //box category style (apply custom widths to the wrapper, not the children)
@@ -131,6 +130,12 @@
         margin-top: 2px;
       }
     }
+  }
+}
+
+.autocomplete, td.category {
+  .badge-wrapper {
+    max-width: 230px;
   }
 }
 
@@ -190,6 +195,8 @@
         line-height: 1;
       }
     .badge-wrapper {
+      box-sizing: border-box;
+
       &.bar {
         padding: 5px 0;
         width: 100%;
@@ -208,7 +215,9 @@
         margin-top: 0;
         width: 100%;
         line-height: 1;
+        vertical-align: text-top;
         span.badge-category {
+          max-width: 100px;
           padding: 5px;
         }
       }
@@ -238,6 +247,10 @@
     color: $secondary;
   }
 
+  &:hover {
+    color: $secondary;
+  }
+
   // New posts
 
   &.new-posts, &.unread-posts {
@@ -262,9 +275,9 @@
 
   &.clicks {
     font-weight: normal;
-    background-color: dark-light-diff($primary, $secondary, 85%, -60%);
+    background-color: dark-light-diff($primary, $secondary, 88%, -60%);
     top: -1px;
-    color: dark-light-diff($primary, $secondary, 50%, -20%);
+    color: dark-light-diff($primary, $secondary, 40%, -20%);
     position: relative;
     margin-left: 2px;
     border: none;

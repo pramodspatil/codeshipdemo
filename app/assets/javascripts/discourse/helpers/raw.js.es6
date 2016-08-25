@@ -1,12 +1,17 @@
-import registerUnbound from 'discourse/helpers/register-unbound';
+import { registerUnbound } from 'discourse/lib/helpers';
+
+// see: https://github.com/emberjs/ember.js/issues/12634
+var missingViews = {};
 
 function renderRaw(ctx, template, templateName, params) {
   params.parent = params.parent || ctx;
 
-  if (!params.view) {
+  if (!params.view && !missingViews[templateName]) {
     var viewClass = Discourse.__container__.lookupFactory('view:' + templateName);
     if (viewClass) {
       params.view = viewClass.create(params);
+    } else {
+      missingViews[templateName] = true;
     }
   }
 
@@ -19,6 +24,5 @@ registerUnbound('raw', function(templateName, params) {
     Ember.warn('Could not find raw template: ' + templateName);
     return;
   }
-
   return renderRaw(this, template, templateName, params);
 });

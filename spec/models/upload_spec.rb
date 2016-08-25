@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 require 'digest/sha1'
 
 describe Upload do
@@ -62,9 +62,8 @@ describe Upload do
     end
 
     it "computes width & height for images" do
-      FastImage.any_instance.expects(:size).returns([100, 200])
       ImageSizer.expects(:resize)
-      image.expects(:rewind).twice
+      image.expects(:rewind).times(3)
       Upload.create_for(user_id, image, image_filename, image_filesize)
     end
 

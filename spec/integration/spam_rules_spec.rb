@@ -1,13 +1,13 @@
 # encoding: UTF-8
 
-require 'spec_helper'
+require 'rails_helper'
 
 describe SpamRulesEnforcer do
 
   describe 'auto-blocking users based on flagging' do
     before do
       SiteSetting.stubs(:flags_required_to_hide_post).returns(0) # never
-      SiteSetting.stubs(:num_flags_to_block_new_user).returns(2)
+      SiteSetting.stubs(:num_spam_flags_to_block_new_user).returns(2)
       SiteSetting.stubs(:num_users_to_block_new_user).returns(2)
     end
 

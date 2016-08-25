@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 RSpec.describe UserProfileView do
   let(:user) { Fabricate(:user) }
@@ -35,5 +35,10 @@ RSpec.describe UserProfileView do
       add(user_profile_id, ip, other_user.id, time)
       expect(described_class.count).to eq(1)
     end
+  end
+
+  it "should not create a profile view for the system user" do
+    add(user_profile_id, '1.1.1.1', Discourse::SYSTEM_USER_ID)
+    expect(described_class.count).to eq(0)
   end
 end

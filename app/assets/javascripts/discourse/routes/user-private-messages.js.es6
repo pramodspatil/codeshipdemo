@@ -1,6 +1,14 @@
-import UserActivityRoute from 'discourse/routes/user-activity';
+export default Discourse.Route.extend({
 
-export default UserActivityRoute.extend({
+  renderTemplate() {
+    this.render('user/messages');
+  },
+
+
+  model() {
+    return this.modelFor("user");
+  },
+
   actions: {
     willTransition: function() {
       this._super();

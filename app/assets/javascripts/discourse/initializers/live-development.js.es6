@@ -1,4 +1,5 @@
 import loadScript from 'discourse/lib/load-script';
+import DiscourseURL from 'discourse/lib/url';
 
 //  Use the message bus for live reloading of components for faster development.
 export default {
@@ -30,9 +31,17 @@ export default {
       });
     });
 
+    // Useful to export this for debugging purposes
+    if (Discourse.Environment === 'development' && !Ember.testing) {
+      window.DiscourseURL = DiscourseURL;
+    }
+
     // Observe file changes
     messageBus.subscribe("/file-change", function(data) {
-      Ember.TEMPLATES.empty = Handlebars.compile("<div></div>");
+      if (Handlebars.compile && !Ember.TEMPLATES.empty) {
+        // hbs notifications only happen in dev
+        Ember.TEMPLATES.empty = Handlebars.compile("<div></div>");
+      }
       _.each(data,function(me) {
 
         if (me === "refresh") {

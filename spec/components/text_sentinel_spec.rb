@@ -1,6 +1,6 @@
 # encoding: utf-8
 
-require 'spec_helper'
+require 'rails_helper'
 require 'text_sentinel'
 
 describe TextSentinel do
@@ -49,7 +49,7 @@ describe TextSentinel do
     [ 'evil trout is evil',
       "去年十社會警告",
       "P.S. Пробирочка очень толковая и весьма умная, так что не обнимайтесь.",
-      "LOOK: 去年十社會警告"
+      "Look: 去年十社會警告"
     ].each do |valid_body|
       it "handles a valid body in a private message" do
         expect(TextSentinel.body_sentinel(valid_body, private_message: true)).to be_valid
@@ -72,6 +72,15 @@ describe TextSentinel do
 
     it "doesn't allow all caps topics" do
       expect(TextSentinel.new(valid_string.upcase)).not_to be_valid
+    end
+
+    it "doesn't allow all caps foreign topics" do
+      expect(TextSentinel.new('É COM VOCÊ LOMBARDIAM. MA VEJAM SÓ, VEJAM SÓ. VALENDO UM MILHÃO DE REAISAMMM. MA VALE DÉRREAISAM?')).not_to be_valid
+    end
+
+    it "allows all caps topics when loud posts are allowed" do
+      SiteSetting.stubs(:allow_uppercase_posts).returns(true)
+      expect(TextSentinel.new(valid_string.upcase)).to be_valid
     end
 
     it "enforces the minimum entropy" do

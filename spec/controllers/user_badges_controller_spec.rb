@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe UserBadgesController do
   let(:user) { Fabricate(:user) }
@@ -12,9 +12,11 @@ describe UserBadgesController do
 
       xhr :get, :index, badge_id: badge.id
       expect(response.status).to eq(200)
+
       parsed = JSON.parse(response.body)
       expect(parsed["topics"]).to eq(nil)
-      expect(parsed["user_badges"][0]["post_id"]).to eq(nil)
+      expect(parsed["badges"].length).to eq(1)
+      expect(parsed["user_badge_info"]["user_badges"][0]["post_id"]).to eq(nil)
     end
   end
 
@@ -22,7 +24,7 @@ describe UserBadgesController do
     let!(:user_badge) { UserBadge.create(badge: badge, user: user, granted_by: Discourse.system_user, granted_at: Time.now) }
 
     it 'requires username or badge_id to be specified' do
-      expect { xhr :get, :index }.to raise_error
+      expect { xhr :get, :index }.to raise_error(ActionController::ParameterMissing)
     end
 
     it 'returns user_badges for a user' do
@@ -38,7 +40,7 @@ describe UserBadgesController do
 
       expect(response.status).to eq(200)
       parsed = JSON.parse(response.body)
-      expect(parsed["user_badges"].length).to eq(1)
+      expect(parsed["user_badge_info"]["user_badges"].length).to eq(1)
     end
 
     it 'includes counts when passed the aggregate argument' do
@@ -52,7 +54,7 @@ describe UserBadgesController do
 
   context 'create' do
     it 'requires username to be specified' do
-      expect { xhr :post, :create, badge_id: badge.id }.to raise_error
+      expect { xhr :post, :create, badge_id: badge.id }.to raise_error(ActionController::ParameterMissing)
     end
 
     it 'does not allow regular users to grant badges' do

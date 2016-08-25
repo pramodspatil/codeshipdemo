@@ -76,7 +76,7 @@ class Search
   def self.prepare_data(search_data)
     data = search_data.squish
     # TODO rmmseg is designed for chinese, we need something else for Korean / Japanese
-    if ['zh_TW', 'zh_CN', 'ja', 'ko'].include?(SiteSetting.default_locale)
+    if ['zh_TW', 'zh_CN', 'ja', 'ko'].include?(SiteSetting.default_locale) || SiteSetting.search_tokenize_chinese_japanese_korean
       unless defined? RMMSeg
         require 'rmmseg'
         RMMSeg::Dictionary.load_dictionaries
@@ -94,6 +94,64 @@ class Search
     data
   end
 
+  def self.word_to_date(str)
+
+    if str =~ /^[0-9]{1,3}$/
+      return Time.zone.now.beginning_of_day.days_ago(str.to_i)
+    end
+
+    if str =~ /^([12][0-9]{3})(-([0-1]?[0-9]))?(-([0-3]?[0-9]))?$/
+      year = $1.to_i
+      month = $2 ? $3.to_i : 1
+      day = $4 ? $5.to_i : 1
+
+      return if day==0 || month==0 || day > 31 || month > 12
+
+      return Time.zone.parse("#{year}-#{month}-#{day}") rescue nil
+    end
+
+    if str.downcase == "yesterday"
+      return Time.zone.now.beginning_of_day.yesterday
+    end
+
+    titlecase = str.downcase.titlecase
+
+    if Date::DAYNAMES.include?(titlecase)
+      return Time.zone.now.beginning_of_week(str.downcase.to_sym)
+    end
+
+    if idx = (Date::MONTHNAMES.find_index(titlecase) ||
+              Date::ABBR_MONTHNAMES.find_index(titlecase))
+      delta = Time.zone.now.month - idx
+      delta += 12 if delta < 0
+      Time.zone.now.beginning_of_month.months_ago(delta)
+    end
+  end
+
+  def self.min_post_id_no_cache
+    return 0 unless SiteSetting.search_prefer_recent_posts?
+
+
+    offset, has_more = Post.unscoped
+                           .order('id desc')
+                           .offset(SiteSetting.search_recent_posts_size-1)
+                           .limit(2)
+                           .pluck(:id)
+
+    has_more ? offset : 0
+  end
+
+  def self.min_post_id(opts=nil)
+    return 0 unless SiteSetting.search_prefer_recent_posts?
+
+    # It can be quite slow to count all the posts so let's cache it
+    Rails.cache.fetch("search-min-post-id:#{SiteSetting.search_recent_posts_size}", expires_in: 1.week) do
+      min_post_id_no_cache
+    end
+  end
+
+  attr_accessor :term
+
   def initialize(term, opts=nil)
     @opts = opts || {}
     @guardian = @opts[:guardian] || Guardian.new
@@ -101,6 +159,7 @@ class Search
     @include_blurbs = @opts[:include_blurbs] || false
     @blurb_length = @opts[:blurb_length]
     @limit = Search.per_facet
+    @valid = true
 
     term = process_advanced_search!(term)
 
@@ -121,14 +180,26 @@ class Search
     @results = GroupedSearchResults.new(@opts[:type_filter], term, @search_context, @include_blurbs, @blurb_length)
   end
 
+  def valid?
+    @valid
+  end
+
   def self.execute(term, opts=nil)
     self.new(term, opts).execute
   end
 
   # Query a term
   def execute
-    if @term.blank? || @term.length < (@opts[:min_search_term_length] || SiteSetting.min_search_term_length)
-      return nil unless @filters.present?
+
+    unless @filters.present?
+      min_length = @opts[:min_search_term_length] || SiteSetting.min_search_term_length
+      terms = (@term || '').split(/\s(?=(?:[^"]|"[^"]*")*$)/).reject {|t| t.length < min_length }
+
+      if terms.blank?
+        @term = ''
+        @valid = false
+        return
+      end
     end
 
     # If the term is a number or url to a topic, just include that topic
@@ -185,6 +256,22 @@ class Search
     posts.where("posts.post_number = 1")
   end
 
+  advanced_filter(/in:pinned/) do |posts|
+    posts.where("topics.pinned_at IS NOT NULL")
+  end
+
+  advanced_filter(/in:unpinned/) do |posts|
+    if @guardian.user
+      posts.where("topics.pinned_at IS NOT NULL AND topics.id IN (
+                  SELECT topic_id FROM topic_users WHERE user_id = ? AND cleared_pinned_at IS NOT NULL
+                 )", @guardian.user.id)
+    end
+  end
+
+  advanced_filter(/in:wiki/) do |posts,match|
+    posts.where(wiki: true)
+  end
+
   advanced_filter(/badge:(.*)/) do |posts,match|
     badge_id = Badge.where('name ilike ? OR id = ?', match, match.to_i).pluck(:id).first
     if badge_id
@@ -225,11 +312,34 @@ class Search
   end
 
   advanced_filter(/category:(.+)/) do |posts,match|
-    category_id = Category.where('name ilike ? OR id = ?', match, match.to_i).pluck(:id).first
+    category_ids = Category.where('name ilike ? OR id = ? OR parent_category_id = ?', match, match.to_i, match.to_i).pluck(:id)
+    if category_ids.present?
+      posts.where("topics.category_id IN (?)", category_ids)
+    else
+      posts.where("1 = 0")
+    end
+  end
+
+  advanced_filter(/^\#([a-zA-Z0-9\-:]+)/) do |posts,match|
+    slug = match.to_s.split(":")
+    if slug[1]
+      # sub category
+      parent_category_id = Category.where(slug: slug[0].downcase, parent_category_id: nil).pluck(:id).first
+      category_id = Category.where(slug: slug[1].downcase, parent_category_id: parent_category_id).pluck(:id).first
+    else
+      # main category
+      category_id = Category.where(slug: slug[0].downcase, parent_category_id: nil).pluck(:id).first
+    end
+
     if category_id
       posts.where("topics.category_id = ?", category_id)
     else
-      posts.where("1 = 0")
+      posts.where("topics.id IN (
+        SELECT DISTINCT(tt.topic_id)
+        FROM topic_tags tt, tags
+        WHERE tt.tag_id = tags.id
+        AND tags.name = ?
+        )", slug[0])
     end
   end
 
@@ -243,7 +353,7 @@ class Search
   end
 
   advanced_filter(/user:(.+)/) do |posts,match|
-    user_id = User.where('username_lower = ? OR id = ?', match.downcase, match.to_i).pluck(:id).first
+    user_id = User.where(staged: false).where('username_lower = ? OR id = ?', match.downcase, match.to_i).pluck(:id).first
     if user_id
       posts.where("posts.user_id = #{user_id}")
     else
@@ -251,14 +361,40 @@ class Search
     end
   end
 
-  advanced_filter(/min_age:(\d+)/) do |posts,match|
-    n = match.to_i
-    posts.where("topics.created_at > ?", n.days.ago)
+  advanced_filter(/^\@([a-zA-Z0-9_\-.]+)/) do |posts,match|
+    user_id = User.where(staged: false).where(username_lower: match.downcase).pluck(:id).first
+    if user_id
+      posts.where("posts.user_id = #{user_id}")
+    else
+      posts.where("1 = 0")
+    end
   end
 
-  advanced_filter(/max_age:(\d+)/) do |posts,match|
-    n = match.to_i
-    posts.where("topics.created_at < ?", n.days.ago)
+  advanced_filter(/before:(.*)/) do |posts,match|
+    if date = Search.word_to_date(match)
+      posts.where("posts.created_at < ?", date)
+    else
+      posts
+    end
+  end
+
+  advanced_filter(/after:(.*)/) do |posts,match|
+    if date = Search.word_to_date(match)
+      posts.where("posts.created_at > ?", date)
+    else
+      posts
+    end
+  end
+
+  advanced_filter(/tags?:([a-zA-Z0-9,\-_]+)/) do |posts, match|
+    tags = match.split(",")
+
+    posts.where("topics.id IN (
+      SELECT DISTINCT(tt.topic_id)
+      FROM topic_tags tt, tags
+      WHERE tt.tag_id = tags.id
+      AND tags.name in (?)
+      )", tags)
   end
 
   private
@@ -298,6 +434,9 @@ class Search
           @order = :likes
           nil
         elsif word == 'in:private'
+          @search_pms = true
+          nil
+        elsif word =~ /^private_messages:(.+)$/
           @search_pms = true
           nil
         else
@@ -383,7 +522,8 @@ class Search
 
       users = User.includes(:user_search_data)
                   .references(:user_search_data)
-                  .where("active = TRUE")
+                  .where(active: true)
+                  .where(staged: false)
                   .where("user_search_data.search_data @@ #{ts_query("simple")}")
                   .order("CASE WHEN username_lower = '#{@original_term.downcase}' THEN 0 ELSE 1 END")
                   .order("last_posted_at DESC")
@@ -416,10 +556,21 @@ class Search
 
       if @term.present?
         if is_topic_search
+
+          term_without_quote = @term
+          if @term =~ /"(.+)"/
+            term_without_quote = $1
+          end
+
+          if @term =~ /'(.+)'/
+            term_without_quote = $1
+          end
+
           posts = posts.joins('JOIN users u ON u.id = posts.user_id')
-          posts = posts.where("posts.raw  || ' ' || u.username || ' ' || u.name ilike ?", "%#{@term}%")
+          posts = posts.where("posts.raw  || ' ' || u.username || ' ' || COALESCE(u.name, '') ilike ?", "%#{term_without_quote}%")
         else
           posts = posts.where("post_search_data.search_data @@ #{ts_query}")
+
           exact_terms = @term.scan(/"([^"]+)"/).flatten
           exact_terms.each do |exact|
             posts = posts.where("posts.raw ilike ?", "%#{exact}%")
@@ -441,7 +592,15 @@ class Search
         if @search_context.is_a?(User)
 
           if opts[:private_messages]
-            posts = posts.where("topics.id IN (SELECT topic_id FROM topic_allowed_users WHERE user_id = ?)", @search_context.id)
+            posts = posts.where("topics.id IN (SELECT topic_id
+                                               FROM topic_allowed_users
+                                               WHERE user_id = :user_id
+                                               UNION ALL
+                                               SELECT tg.topic_id
+                                               FROM topic_allowed_groups tg
+                                               JOIN group_users gu ON gu.user_id = :user_id AND
+                                                                        gu.group_id = tg.group_id)",
+                                              user_id: @search_context.id)
           else
             posts = posts.where("posts.user_id = #{@search_context.id}")
           end
@@ -523,33 +682,56 @@ class Search
       @ts_query_cache[(locale || query_locale) + " " + @term] ||= Search.ts_query(@term, locale)
     end
 
-    def aggregate_search(opts = {})
+    def wrap_rows(query)
+      "SELECT *, row_number() over() row_number FROM (#{query.to_sql}) xxx"
+    end
 
+    def aggregate_post_sql(opts)
       min_or_max = @order == :latest ? "max" : "min"
 
-      post_sql =
+      query =
         if @order == :likes
           # likes are a pain to aggregate so skip
           posts_query(@limit, private_messages: opts[:private_messages])
             .select('topics.id', "post_number")
-            .to_sql
         else
-          posts_query(@limit, aggregate_search: true,
-                                     private_messages: opts[:private_messages])
+          posts_query(@limit, aggregate_search: true, private_messages: opts[:private_messages])
             .select('topics.id', "#{min_or_max}(post_number) post_number")
             .group('topics.id')
-            .to_sql
         end
 
+      min_id = Search.min_post_id
+      if min_id > 0
+        low_set = query.dup.where("post_search_data.post_id < #{min_id}")
+        high_set = query.where("post_search_data.post_id >= #{min_id}")
+
+        return { default: wrap_rows(high_set), remaining: wrap_rows(low_set) }
+      end
+
       # double wrapping so we get correct row numbers
-      post_sql = "SELECT *, row_number() over() row_number FROM (#{post_sql}) xxx"
+      { default: wrap_rows(query) }
+    end
 
-      posts = Post.includes(:topic => :category)
-                  .joins("JOIN (#{post_sql}) x ON x.id = posts.topic_id AND x.post_number = posts.post_number")
-                  .order('row_number')
+    def aggregate_posts(post_sql)
+      return [] unless post_sql
 
-      posts.each do |post|
-        @results.add(post)
+      Post.includes(:topic => :category)
+        .includes(:user)
+        .joins("JOIN (#{post_sql}) x ON x.id = posts.topic_id AND x.post_number = posts.post_number")
+        .order('row_number')
+    end
+
+    def aggregate_search(opts = {})
+      post_sql = aggregate_post_sql(opts)
+
+      added = 0
+      aggregate_posts(post_sql[:default]).each do |p|
+        @results.add(p)
+        added += 1
+      end
+
+      if added < @limit
+        aggregate_posts(post_sql[:remaining]).each {|p| @results.add(p) }
       end
     end
 
@@ -561,7 +743,9 @@ class Search
 
     def topic_search
       if @search_context.is_a?(Topic)
-        posts = posts_query(@limit).where('posts.topic_id = ?', @search_context.id).includes(:topic => :category)
+        posts = posts_query(@limit).where('posts.topic_id = ?', @search_context.id)
+                                   .includes(:topic => :category)
+                                   .includes(:user)
         posts.each do |post|
           @results.add(post)
         end

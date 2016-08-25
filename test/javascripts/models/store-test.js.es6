@@ -19,6 +19,18 @@ test('createRecord without an `id`', function() {
   ok(!widget.get('id'), 'there is no id');
 });
 
+test("createRecord doesn't modify the input `id` field", () => {
+  const store = createStore();
+  const widget = store.createRecord('widget', {id: 1, name: 'hello'});
+
+  const obj = { id: 1, name: 'something' };
+
+  const other = store.createRecord('widget', obj);
+  equal(widget, other, 'returns the same record');
+  equal(widget.name, 'something', 'it updates the properties');
+  equal(obj.id, 1, 'it does not remove the id from the input');
+});
+
 test('createRecord without attributes', function() {
   const store = createStore();
   const widget = store.createRecord('widget');
@@ -116,7 +128,6 @@ test('destroyRecord when new', function(assert) {
   });
 });
 
-
 test('find embedded', function(assert) {
   const store = createStore();
   return store.find('fruit', 2).then(function(f) {
@@ -136,6 +147,7 @@ test('findAll embedded', function(assert) {
   return store.findAll('fruit').then(function(fruits) {
     assert.equal(fruits.objectAt(0).get('farmer.name'), 'Old MacDonald');
     assert.equal(fruits.objectAt(0).get('farmer'), fruits.objectAt(1).get('farmer'), 'points at the same object');
+    assert.equal(fruits.get('extras.hello'), 'world', 'it can supply extra information');
 
     const fruitCols = fruits.objectAt(0).get('colors');
     assert.equal(fruitCols.length, 2);

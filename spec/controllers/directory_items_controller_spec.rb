@@ -1,9 +1,9 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe DirectoryItemsController do
 
   it "requires a `period` param" do
-    expect{ xhr :get, :index }.to raise_error
+    expect{ xhr :get, :index }.to raise_error(ActionController::ParameterMissing)
   end
 
   it "requires a proper `period` param" do

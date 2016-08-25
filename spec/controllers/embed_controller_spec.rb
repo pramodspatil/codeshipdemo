@@ -1,9 +1,10 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe EmbedController do
 
   let(:host) { "eviltrout.com" }
   let(:embed_url) { "http://eviltrout.com/2013/02/10/why-discourse-uses-emberjs.html" }
+  let(:discourse_username) { "eviltrout" }
 
   it "is 404 without an embed_url" do
     get :comments
@@ -91,9 +92,15 @@ describe EmbedController do
 
       it "creates a topic view when a topic_id is found" do
         TopicEmbed.expects(:topic_id_for_embed).returns(123)
-        TopicView.expects(:new).with(123, nil, {limit: 100, exclude_first: true, exclude_deleted_users: true})
+        TopicView.expects(:new).with(123, nil, {limit: 100, exclude_first: true, exclude_deleted_users: true, exclude_hidden: true})
         get :comments, embed_url: embed_url
       end
+
+      it "provides the topic retriever with the discourse username when provided" do
+        TopicRetriever.expects(:new).with(embed_url, has_entry({author_username: discourse_username}))
+        get :comments, embed_url: embed_url, discourse_username: discourse_username
+      end
+
     end
   end
 

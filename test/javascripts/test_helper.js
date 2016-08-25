@@ -1,34 +1,30 @@
 /*global document, sinon, QUnit, Logster */
 
 //= require env
-
-//= require ../../app/assets/javascripts/preload_store
-
-// probe framework first
 //= require probes
-
-// Externals we need to load first
 //= require jquery.debug
 //= require jquery.ui.widget
 //= require handlebars
 //= require ember.debug
+//= require ember-template-compiler
 //= require message-bus
 //= require ember-qunit
 //= require fake_xml_http_request
 //= require route-recognizer
 //= require pretender
+//= require loader
+//= require preload-store
 
-//= require ../../app/assets/javascripts/locales/i18n
-//= require ../../app/assets/javascripts/locales/en
-
-//= require vendor
-
-//= require htmlparser.js
+//= require locales/i18n
+//= require locales/en
 
 // Stuff we need to load first
+//= require vendor
+//= require ember-shim
+//= require pretty-text-bundle
 //= require main_include
+//= require htmlparser.js
 //= require admin
-//= require_tree ../../app/assets/javascripts/defer
 
 //= require sinon-1.7.1
 //= require sinon-qunit-1.0.0
@@ -43,13 +39,10 @@
 //= require plugin_tests
 //= require_self
 //
-//= require ../../public/javascripts/jquery.magnific-popup-min.js
+//= require jquery.magnific-popup-min.js
 
-window.assetPath = function(url) {
-  if (url.indexOf('defer') === 0) {
-    return "/assets/" + url;
-  }
-};
+window.TestPreloadStore = require('preload-store').default;
+window.inTestEnv = true;
 
 // Stop the message bus so we don't get ajax calls
 window.MessageBus.stop();
@@ -83,6 +76,13 @@ function dup(obj) {
   return jQuery.extend(true, {}, obj);
 }
 
+function resetSite() {
+  var createStore = require('helpers/create-store').default;
+  var siteAttrs = dup(fixtures['site.json'].site);
+  siteAttrs.store = createStore();
+  Discourse.Site.resetCurrent(Discourse.Site.create(siteAttrs));
+}
+
 QUnit.testStart(function(ctx) {
   server = createPretendServer();
 
@@ -92,14 +92,15 @@ QUnit.testStart(function(ctx) {
   Discourse.BaseUrl = "localhost";
   Discourse.Session.resetCurrent();
   Discourse.User.resetCurrent();
-  Discourse.Site.resetCurrent(Discourse.Site.create(dup(fixtures['site.json'].site)));
+  resetSite();
 
   _DiscourseURL.redirectedTo = null;
   _DiscourseURL.redirectTo = function(url) {
     _DiscourseURL.redirectedTo = url;
   };
 
-  PreloadStore.reset();
+  var ps = require('preload-store').default;
+  ps.reset();
 
   window.sandbox = sinon.sandbox.create();
   window.sandbox.stub(ScrollingDOMMethods, "screenNotFull");
@@ -114,9 +115,6 @@ QUnit.testStart(function(ctx) {
     Ember.run.debounce = Ember.run;
   }
 });
-
-// Don't cloak in testing
-Ember.CloakedCollectionView = Ember.CollectionView;
 
 QUnit.testDone(function() {
   Ember.run.debounce = origDebounce;
@@ -137,8 +135,11 @@ window.asyncTestDiscourse = helpers.asyncTestDiscourse;
 window.controllerFor = helpers.controllerFor;
 window.fixture = helpers.fixture;
 
-Ember.keys(requirejs.entries).forEach(function(entry) {
+Object.keys(requirejs.entries).forEach(function(entry) {
   if ((/\-test/).test(entry)) {
     require(entry, null, null, true);
   }
 });
+require('mdtest/mdtest', null, null, true);
+resetSite();
+

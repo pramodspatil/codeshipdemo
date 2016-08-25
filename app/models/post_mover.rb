@@ -41,11 +41,17 @@ class PostMover
     Guardian.new(user).ensure_can_see! topic
     @destination_topic = topic
 
+    moving_all_posts = (@original_topic.posts.pluck(:id).sort == @post_ids.sort)
+
     move_each_post
     notify_users_that_posts_have_moved
     update_statistics
     update_user_actions
     set_last_post_user_id(destination_topic)
+
+    if moving_all_posts
+      @original_topic.update_status('closed', true, @user)
+    end
 
     destination_topic.reload
     destination_topic
@@ -70,6 +76,12 @@ class PostMover
     posts.each do |post|
       post.is_first_post? ? create_first_post(post) : move(post)
     end
+
+    PostReply.where("reply_id in (:post_ids) OR post_id in (:post_ids)", post_ids: post_ids).each do |post_reply|
+      if post_reply.post && post_reply.reply && post_reply.reply.topic_id != post_reply.post.topic_id
+        PostReply.delete_all(reply_id: post_reply.reply.id, post_id: post_reply.post.id)
+      end
+    end
   end
 
   def create_first_post(post)
@@ -77,7 +89,8 @@ class PostMover
       post.user,
       raw: post.raw,
       topic_id: destination_topic.id,
-      acting_user: user
+      acting_user: user,
+      skip_validations: true
     )
     p.update_column(:reply_count, @reply_count[1] || 0)
   end
@@ -107,6 +120,8 @@ class PostMover
   def update_statistics
     destination_topic.update_statistics
     original_topic.update_statistics
+    TopicUser.update_post_action_cache(topic_id: original_topic.id, post_action_type: :bookmark)
+    TopicUser.update_post_action_cache(topic_id: destination_topic.id, post_action_type: :bookmark)
   end
 
   def update_user_actions

@@ -136,7 +136,7 @@
       color: $primary;
     }
     p {
-      color: darken($primary, 40%);;
+      color: darken($primary, 40%);
       font-size: 0.929em;
     }
     .archetype-option {
@@ -266,6 +266,9 @@
   overflow: visible;
   .ember-text-field {
     width: 550px;
+  }
+  .optional {
+    color: #9e9ea6;
   }
 }
 

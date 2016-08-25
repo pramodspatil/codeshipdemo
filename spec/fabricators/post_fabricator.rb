@@ -49,7 +49,7 @@ Fabricator(:post_with_plenty_of_images, from: :post) do
 <aside class="quote"><img src="/uploads/default/1/1234567890123456.jpg"></aside>
 <div class="onebox-result"><img src="/uploads/default/1/1234567890123456.jpg"></div>
 <div class="onebox"><img src="/uploads/default/1/1234567890123456.jpg"></div>
-<p>With an emoji! <img src="//cdn.discourse.org/meta/images/emoji/twitter/smile.png?v=0" title=":smile:" class="emoji" alt="smile" width="72" height="72"></p>
+<p>With an emoji! <img src="//cdn.discourse.org/meta/images/emoji/twitter/smile.png?v=1" title=":smile:" class="emoji" alt="smile" width="72" height="72"></p>
 '
 end
 
@@ -83,6 +83,10 @@ Fabricator(:post_with_large_image_and_title, from: :post) do
   raw '<img src="/uploads/default/1/1234567890123456.jpg" title="WAT">'
 end
 
+Fabricator(:post_with_large_image_on_subfolder, from: :post) do
+  raw '<img src="/subfolder/uploads/default/1/1234567890123456.jpg">'
+end
+
 Fabricator(:post_with_uploads, from: :post) do
   raw '
 <a href="/uploads/default/2/2345678901234567.jpg">Link</a>
@@ -96,6 +100,8 @@ Fabricator(:post_with_uploads_and_links, from: :post) do
 <img src="/uploads/default/1/1234567890123456.jpg">
 <a href="http://www.google.com">Google</a>
 <img src="http://foo.bar/image.png">
+<a class="attachment" href="/uploads/default/original/1X/af2c2618032c679333bebf745e75f9088748d737.txt">text.txt</a> (20 Bytes)
+:smile:
 '
 end
 
@@ -105,8 +111,10 @@ Fabricator(:post_with_external_links, from: :post) do
   raw "
 Here's a link to twitter: http://twitter.com
 And a link to google: http://google.com
+And a secure link to google: https://google.com
 And a markdown link: [forumwarz](http://forumwarz.com)
 And a markdown link with a period after it [codinghorror](http://www.codinghorror.com/blog).
+And one with a hash http://discourse.org#faq
   "
 end
 

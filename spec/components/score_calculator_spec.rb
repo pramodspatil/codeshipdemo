@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 require 'score_calculator'
 
 describe ScoreCalculator do
@@ -47,6 +47,19 @@ describe ScoreCalculator do
       ScoreCalculator.new(reads: 3).calculate
       topic.reload
       expect(topic.has_summary).to eq(false)
+    end
+
+    it "respects the min_topic_age" do
+      topic.update_columns(has_summary: true, bumped_at: 1.month.ago)
+      ScoreCalculator.new(reads: 3).calculate(min_topic_age: 20.days.ago)
+      expect(topic.has_summary).to eq(true)
+    end
+
+    it "respects the max_topic_length" do
+      Fabricate(:post, topic_id: topic.id)
+      topic.update_columns(has_summary: true)
+      ScoreCalculator.new(reads: 3).calculate(max_topic_length: 1)
+      expect(topic.has_summary).to eq(true)
     end
 
     it "won't update the site settings when the site settings don't match" do

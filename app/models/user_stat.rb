@@ -3,6 +3,17 @@ class UserStat < ActiveRecord::Base
   belongs_to :user
   after_save :trigger_badges
 
+  def self.ensure_consistency!(last_seen = 1.hour.ago)
+    reset_bounce_scores
+    update_view_counts(last_seen)
+  end
+
+  def self.reset_bounce_scores
+    UserStat.where("reset_bounce_score_after < now()")
+            .where("bounce_score > 0")
+            .update_all(bounce_score: 0)
+  end
+
   # Updates the denormalized view counts for all users
   def self.update_view_counts(last_seen = 1.hour.ago)
 
@@ -30,8 +41,11 @@ class UserStat < ActiveRecord::Base
               (SELECT pt.user_id,
                       COUNT(*) AS c
                FROM users AS u
-               INNER JOIN post_timings AS pt ON pt.user_id = u.id
-               WHERE u.last_seen_at > :seen_at
+               JOIN post_timings AS pt ON pt.user_id = u.id
+               JOIN topics t ON t.id = pt.topic_id
+               WHERE u.last_seen_at > :seen_at AND
+                     t.archetype = 'regular' AND
+                     t.deleted_at IS NULL
                GROUP BY pt.user_id) AS X
                WHERE X.user_id = user_stats.user_id AND
                      X.c <> posts_read_count
@@ -89,17 +103,19 @@ end
 #
 # Table name: user_stats
 #
-#  user_id               :integer          not null, primary key
-#  topics_entered        :integer          default(0), not null
-#  time_read             :integer          default(0), not null
-#  days_visited          :integer          default(0), not null
-#  posts_read_count      :integer          default(0), not null
-#  likes_given           :integer          default(0), not null
-#  likes_received        :integer          default(0), not null
-#  topic_reply_count     :integer          default(0), not null
-#  new_since             :datetime         not null
-#  read_faq              :datetime
-#  first_post_created_at :datetime
-#  post_count            :integer          default(0), not null
-#  topic_count           :integer          default(0), not null
+#  user_id                  :integer          not null, primary key
+#  topics_entered           :integer          default(0), not null
+#  time_read                :integer          default(0), not null
+#  days_visited             :integer          default(0), not null
+#  posts_read_count         :integer          default(0), not null
+#  likes_given              :integer          default(0), not null
+#  likes_received           :integer          default(0), not null
+#  topic_reply_count        :integer          default(0), not null
+#  new_since                :datetime         not null
+#  read_faq                 :datetime
+#  first_post_created_at    :datetime
+#  post_count               :integer          default(0), not null
+#  topic_count              :integer          default(0), not null
+#  bounce_score             :integer          default(0), not null
+#  reset_bounce_score_after :datetime
 #

@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 require 'email'
 
 describe Email::Styles do
@@ -105,7 +105,7 @@ describe Email::Styles do
 
     context "without https" do
       before do
-        SiteSetting.stubs(:use_https).returns(false)
+        SiteSetting.stubs(:force_https).returns(false)
       end
 
       it "rewrites the href to have http" do
@@ -126,7 +126,7 @@ describe Email::Styles do
 
     context "with https" do
       before do
-        SiteSetting.stubs(:use_https).returns(true)
+        SiteSetting.stubs(:force_https).returns(true)
       end
 
       it "rewrites the forum URL to have https" do

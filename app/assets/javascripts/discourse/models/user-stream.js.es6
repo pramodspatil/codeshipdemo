@@ -1,5 +1,8 @@
+import { ajax } from 'discourse/lib/ajax';
 import { url } from 'discourse/lib/computed';
 import RestModel from 'discourse/models/rest';
+import UserAction from 'discourse/models/user-action';
+import { emojiUnescape } from 'discourse/lib/text';
 
 export default RestModel.extend({
   loaded: false,
@@ -11,13 +14,13 @@ export default RestModel.extend({
   filterParam: function() {
     const filter = this.get('filter');
     if (filter === Discourse.UserAction.TYPES.replies) {
-      return [Discourse.UserAction.TYPES.replies,
-              Discourse.UserAction.TYPES.quotes].join(",");
+      return [UserAction.TYPES.replies,
+              UserAction.TYPES.quotes].join(",");
     }
 
     if(!filter) {
-      return [Discourse.UserAction.TYPES.topics,
-              Discourse.UserAction.TYPES.posts].join(",");
+      return [UserAction.TYPES.topics,
+              UserAction.TYPES.posts].join(",");
     }
 
     return filter;
@@ -65,15 +68,15 @@ export default RestModel.extend({
 
     if (this.get('loading')) { return Ember.RSVP.resolve(); }
     this.set('loading', true);
-    return Discourse.ajax(findUrl, {cache: 'false'}).then( function(result) {
+    return ajax(findUrl, {cache: 'false'}).then( function(result) {
       if (result && result.user_actions) {
         const copy = Em.A();
         result.user_actions.forEach(function(action) {
-          action.title = Discourse.Emoji.unescape(Handlebars.Utils.escapeExpression(action.title));
-          copy.pushObject(Discourse.UserAction.create(action));
+          action.title = emojiUnescape(Handlebars.Utils.escapeExpression(action.title));
+          copy.pushObject(UserAction.create(action));
         });
 
-        self.get('content').pushObjects(Discourse.UserAction.collapseStream(copy));
+        self.get('content').pushObjects(UserAction.collapseStream(copy));
         self.setProperties({
           loaded: true,
           itemsLoaded: self.get('itemsLoaded') + result.user_actions.length

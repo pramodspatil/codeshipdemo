@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 require 'discourse_plugin_registry'
 
 describe DiscoursePluginRegistry do
@@ -26,13 +26,6 @@ describe DiscoursePluginRegistry do
     it 'defaults to an empty Set' do
       registry.javascripts = nil
       expect(registry.javascripts).to eq(Set.new)
-    end
-  end
-
-  context '#server_side_javascripts' do
-    it 'defaults to an empty Set' do
-      registry.server_side_javascripts = nil
-      expect(registry.server_side_javascripts).to eq(Set.new)
     end
   end
 
@@ -139,15 +132,6 @@ describe DiscoursePluginRegistry do
 
       expect(registry.admin_javascripts.count).to eq(1)
       expect(registry.javascripts.count).to eq(0)
-      expect(registry.server_side_javascripts.count).to eq(0)
-    end
-
-    it "registers server side javascript properly" do
-      registry.register_asset("my_admin.js", :server_side)
-
-      expect(registry.server_side_javascripts.count).to eq(1)
-      expect(registry.javascripts.count).to eq(1)
-      expect(registry.admin_javascripts.count).to eq(0)
     end
   end
 

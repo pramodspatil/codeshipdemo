@@ -147,10 +147,10 @@ SQL
       # so callback is called
       action.save
       action.add_moderator_post_if_needed(moderator, :agreed, delete_post)
-      @trigger_spam = true if action.post_action_type_id == PostActionType.types[:spam]
+      trigger_spam = true if action.post_action_type_id == PostActionType.types[:spam]
     end
 
-    DiscourseEvent.trigger(:confirmed_spam_post, post) if @trigger_spam
+    DiscourseEvent.trigger(:confirmed_spam_post, post) if trigger_spam
 
     update_flagged_posts_count
   end
@@ -213,20 +213,21 @@ SQL
 
     return unless opts[:message] && [:notify_moderators, :notify_user, :spam].include?(post_action_type)
 
-    title = I18n.t("post_action_types.#{post_action_type}.email_title", title: post.topic.title)
-    body = I18n.t("post_action_types.#{post_action_type}.email_body", message: opts[:message], link: "#{Discourse.base_url}#{post.url}")
-
+    title = I18n.t("post_action_types.#{post_action_type}.email_title", title: post.topic.title, locale: SiteSetting.default_locale)
+    body = I18n.t("post_action_types.#{post_action_type}.email_body", message: opts[:message], link: "#{Discourse.base_url}#{post.url}", locale: SiteSetting.default_locale)
+    warning = opts[:is_warning] if opts[:is_warning].present?
     title = title.truncate(255, separator: /\s/)
 
     opts = {
       archetype: Archetype.private_message,
+      is_warning: warning,
       title: title,
       raw: body
     }
 
     if [:notify_moderators, :spam].include?(post_action_type)
       opts[:subtype] = TopicSubtype.notify_moderators
-      opts[:target_group_names] = "moderators"
+      opts[:target_group_names] = target_moderators
     else
       opts[:subtype] = TopicSubtype.notify_user
       opts[:target_usernames] = if post_action_type == :notify_user
@@ -241,7 +242,14 @@ SQL
     PostCreator.new(user, opts).create.try(:id)
   end
 
+  def self.limit_action!(user,post,post_action_type_id)
+    RateLimiter.new(user, "post_action-#{post.id}_#{post_action_type_id}", 4, 1.minute).performed!
+  end
+
   def self.act(user, post, post_action_type_id, opts = {})
+
+    limit_action!(user,post,post_action_type_id)
+
     related_post_id = create_message_for_post_action(user, post, post_action_type_id, opts)
     staff_took_action = opts[:take_action] || false
 
@@ -272,18 +280,18 @@ SQL
       post_action.recover!
       action_attrs.each { |attr, val| post_action.send("#{attr}=", val) }
       post_action.save
+      PostAlertObserver.after_create_post_action(post_action)
     else
       post_action = create(where_attrs.merge(action_attrs))
       if post_action && post_action.errors.count == 0
         BadgeGranter.queue_badge_grant(Badge::Trigger::PostAction, post_action: post_action)
       end
     end
+    GivenDailyLike.increment_for(user.id)
 
     # agree with other flags
     if staff_took_action
       PostAction.agree_flags!(post, user)
-
-      # update counters
       post_action.try(:update_counters)
     end
 
@@ -295,11 +303,15 @@ SQL
   end
 
   def self.remove_act(user, post, post_action_type_id)
+
+    limit_action!(user,post,post_action_type_id)
+
     finder = PostAction.where(post_id: post.id, user_id: user.id, post_action_type_id: post_action_type_id)
     finder = finder.with_deleted.includes(:post) if user.try(:staff?)
     if action = finder.first
       action.remove_act!(user)
       action.post.unhide! if action.staff_took_action
+      GivenDailyLike.decrement_for(user.id)
     end
   end
 
@@ -436,7 +448,7 @@ SQL
     post = Post.with_deleted.where(id: post_id).first
     PostAction.auto_close_if_threshold_reached(post.topic)
     PostAction.auto_hide_if_needed(user, post, post_action_type_key)
-    SpamRulesEnforcer.enforce!(post.user) if post_action_type_key == :spam
+    SpamRulesEnforcer.enforce!(post.user)
   end
 
   def notify_subscribers
@@ -480,10 +492,10 @@ SQL
     elsif PostActionType.auto_action_flag_types.include?(post_action_type) &&
           SiteSetting.flags_required_to_hide_post > 0
 
-      old_flags, new_flags = PostAction.flag_counts_for(post.id)
+      _old_flags, new_flags = PostAction.flag_counts_for(post.id)
 
       if new_flags >= SiteSetting.flags_required_to_hide_post
-        hide_post!(post, post_action_type, guess_hide_reason(old_flags))
+        hide_post!(post, post_action_type, guess_hide_reason(post))
       end
     end
   end
@@ -492,11 +504,14 @@ SQL
     return if post.hidden
 
     unless reason
-      old_flags,_ = PostAction.flag_counts_for(post.id)
-      reason = guess_hide_reason(old_flags)
+      reason = guess_hide_reason(post)
     end
 
-    Post.where(id: post.id).update_all(["hidden = true, hidden_at = ?, hidden_reason_id = COALESCE(hidden_reason_id, ?)", Time.now, reason])
+    post.hidden = true
+    post.hidden_at = Time.zone.now
+    post.hidden_reason_id = reason
+    post.save
+
     Topic.where("id = :topic_id AND NOT EXISTS(SELECT 1 FROM POSTS WHERE topic_id = :topic_id AND NOT hidden)", topic_id: post.topic_id).update_all(visible: false)
 
     # inform user
@@ -510,8 +525,8 @@ SQL
     end
   end
 
-  def self.guess_hide_reason(old_flags)
-    old_flags > 0 ?
+  def self.guess_hide_reason(post)
+    post.hidden_at ?
       Post.hidden_reasons[:flag_threshold_reached_again] :
       Post.hidden_reasons[:flag_threshold_reached]
   end

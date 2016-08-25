@@ -159,7 +159,6 @@ uk:
     undo: "Скасувати"
     revert: "Повернути"
     failed: "Помилка"
-    switch_to_anon: "Потайливий перегляд"
     banner:
       close: "Сховати"
     choose_topic:
@@ -212,7 +211,6 @@ uk:
       members: "Учасники"
       posts: "Дописи"
       alias_levels:
-        title: "Хто може використовувати цю групу як аліас?"
         nobody: "Ніхто"
         only_admins: "Лише адміністратори"
         mods_and_admins: "Лише модератори та адміністратори"
@@ -226,7 +224,6 @@ uk:
       '5': "Відповіді"
       '7': "Згадки"
       '9': "Цитати"
-      '10': "Позначені зірочкою"
       '11': "Редагування"
       '12': "Надіслані"
       '13': "Вхідні"
@@ -277,13 +274,9 @@ uk:
         perm_default: "Ввімкнути сповіщення"
         perm_denied_btn: "Немає доступу"
         disable: "Вимкнути сповіщення"
-        currently_enabled: "(зараз увімкнено)"
         enable: "Увімкнути сповіщення"
-        currently_disabled: "(зараз вимкнено)"
-      dismiss_notifications: "Позначити все як прочитане"
       dismiss_notifications_tooltip: "Позначити всі сповіщення як прочитані"
       disable_jump_reply: "Не перескакувати до мого допису коли я відповім"
-      edit_history_public: "Дати іншим дивитися версії мого повідомлення"
       external_links_in_new_tab: "Відкривати всі зовнішні посилання у новій вкладці"
       enable_quoting: "Увімкнути відповіді на цитати для виділеного тексту"
       change: "змінити"
@@ -295,7 +288,6 @@ uk:
       suspended_notice: "Цього користувача призупинено до {{date}}."
       suspended_reason: "Причина: "
       github_profile: "Github"
-      mailing_list_mode: "Надсилати всі нові дописи мені електронною поштою (доки я це не вимкну)"
       watched_categories: "Відслідковувані"
       tracked_categories: "Відстежувані"
       muted_categories: "Ігноровані"
@@ -313,8 +305,6 @@ uk:
         warnings_received: "попередження"
       messages:
         all: "Всі"
-        mine: "Мої"
-        unread: "Непрочитані"
       change_password:
         success: "(лист надіслано)"
         in_progress: "(надсилання листа)"
@@ -325,7 +315,6 @@ uk:
         title: "Змінити Про мене"
       change_username:
         title: "Зміна імені користувача"
-        confirm: "Якщо Ви зміните ім'я користувача, всі попередні цитування Ваших дописів та згадки @імені буде порушено. Ви точно абсолютно впевнені, що хочете цього?"
         taken: "Даруйте, це ім'я користувача вже зайняте."
         error: "Під час зміни імені користувача трапилася помилка."
         invalid: "Таке ім'я користувача не підійде. Воно має містити лише цифри та літери"
@@ -464,7 +453,6 @@ uk:
     unmute: Unmute
     last_post: Останній допис
     summary:
-      description: "Тут <b>{{count}}</b> відповідей."
       enable: 'Підсумувати цю тему'
       disable: 'Показати всі дописи'
     deleted_filter:
@@ -763,7 +751,6 @@ uk:
         create: "Даруйте, під час створення допису трапилася помилка. Будь ласка, спробуйте ще раз."
         edit: "Даруйте, під час редагування допису трапилася помилка. Будь ласка, спробуйте ще раз."
         upload: "Даруйте, під час завантаження цього файлу трапилася помилка. Будь ласка, спробуйте ще раз."
-        attachment_too_large: "Даруйте, але файл, який Ви намагаєтеся завантажити, надто великий (максимальний розмір складає {{max_size_kb}} кБ)."
         too_many_uploads: "Даруйте, але Ви можете одночасно завантажувати тільки один файл."
         upload_not_authorized: "Даруйте, але файл, який Ви намагаєтеся завантажити, є недозволеним (дозволені розширення: {{authorized_extensions}})."
         image_upload_not_allowed_for_new_user: "Даруйте, нові користувачі не можуть завантажувати зображення."
@@ -805,12 +792,6 @@ uk:
           bookmark: "Скасувати закладку"
           like: "Скасувати вподобання"
           vote: "Відкликати голос"
-        people:
-          notify_moderators: "Звернули увагу модераторів: {{icons}}"
-          notify_moderators_with_url: "<a href='{{postUrl}}'>Звернули увагу модераторів</a>: {{icons}}"
-          bookmark: "Лишили тут закладку: {{icons}}"
-          like: "Вподобали це: {{icons}}"
-          vote: "Проголосували за це: {{icons}}"
         by_you:
           off_topic: "Ви поскаржилися на це як на недотичне до теми"
           spam: "Ви поскаржилися на це як на спам"
@@ -819,9 +800,6 @@ uk:
           bookmark: "Ви лишили тут закладку"
           like: "Ви це вподобали"
           vote: "Ви проголосували за цей допис"
-      edits:
-        one: '{{count}} редагування'
-        other: "без редагувань"
       delete:
         confirm:
           one: "Ви впевнені, що хочете видалити цей допис?"
@@ -900,7 +878,6 @@ uk:
       action: "Flag Topic"
     topic_map:
       title: "Підсумок теми"
-      links_shown: "показати всі {{totalLinks}} посилання..."
     topic_statuses:
       locked:
         help: "цю тему закрито; нові відповіді більше не приймаються"
@@ -938,28 +915,14 @@ uk:
         title: "Категорії"
         title_in: "Категорія - {{categoryName}}"
         help: "всі теми, згруповані за категоріями"
-      unread:
-        title:
-          one: "Непрочитані ({{count}})"
-          other: "Непрочитані"
       new:
-        lower_title_with_count:
-          one: "{{count}} new"
         lower_title: "new"
-        title:
-          zero: "Новий"
-          one: "Нові ({{count}})"
-          other: "Нові"
       posted:
         title: "Мої дописи"
         help: "теми, в які Ви дописували"
       bookmarks:
         title: "Закладки"
       category:
-        title:
-          zero: "{{categoryName}}"
-          one: "{{categoryName}} ({{count}})"
-          other: "{{categoryName}}"
         help: "Останні теми в категорії {{categoryName}}"
       top:
         title: "Top"
@@ -1071,12 +1034,6 @@ uk:
           backups: "Backups"
           logs: "Logs"
         none: "No backup available."
-        read_only:
-          enable:
-            title: "Enable the read-only mode"
-            confirm: "Are you sure you want to enable the read-only mode?"
-          disable:
-            title: "Disable the read-only mode"
         logs:
           none: "No logs yet..."
         columns:
@@ -1101,10 +1058,8 @@ uk:
           restore:
             is_disabled: "Restore is disabled in the site settings."
             title: "Restore the backup"
-            confirm: "Are your sure you want to restore this backup?"
           rollback:
             title: "Rollback the database to previous working state"
-            confirm: "Are your sure you want to rollback the database to the previous working state?"
       customize:
         title: "Customize"
         long_title: "Site Customizations"
@@ -1147,9 +1102,8 @@ uk:
           love:
             description: "Колір кнопки \"Подобається\"."
       email:
-        title: "Електронна пошта"
         settings: "Налаштування"
-        all: "All"
+        preview_digest: "Стислий виклад новин"
         sent: "Sent"
         skipped: "Skipped"
         sent_at: "Надіслано"
@@ -1161,7 +1115,6 @@ uk:
         send_test: "Надіслати Тестовий Email"
         sent_test: "надіслано!"
         delivery_method: "Спосіб доставки"
-        preview_digest: "Стислий виклад новин"
         refresh: "Оновити"
         format: "Формат"
         html: "html"
@@ -1326,7 +1279,6 @@ uk:
         trust_level_3_requirements: "Вимоги для Рівня довіри 3"
         tl3_requirements:
           title: "Вимоги для Рівня довіри 3"
-          table_title: "Протягом останніх 100 днів:"
           value_heading: "Значення"
           requirement_heading: "Вимога"
           visits: "Відвідини"
@@ -1399,68 +1351,3 @@ uk:
         delete_confirm: Ви впевнені, що хочете видалити це постійне посилання?
         form:
           add: "Додати"
-    lightbox:
-      download: "звантажити"
-    keyboard_shortcuts_help:
-      title: 'Поєднання клавіш'
-      jump_to:
-        title: 'Перейти до'
-        categories: '<b>g</b>,  <b>c</b> Категорії'
-      navigation:
-        title: 'Навігація'
-        back: '<b>u</b> Назад'
-        open: '<b>o</b> або <b>Enter</b> Відкрити обрану тему'
-      application:
-        title: 'Застосунок'
-        create: '<b>c</b> Створити нову тему'
-        notifications: '<b>n</b> Відкрити сповіщення'
-        search: '<b>/</b> Пошук'
-      actions:
-        title: 'Дії'
-        share_post: '<b>s</b> Поширити допис'
-        reply_post: '<b>r</b> Відповісти на допис'
-        quote_post: '<b>q</b> Цитувати допис'
-        like: '<b>l</b> Вподобати допис'
-        flag: '<b>!</b> Поскаржитися на допис'
-        bookmark: '<b>b</b> Лишити закладку в дописі'
-        edit: '<b>e</b> Редагувати допис'
-        delete: '<b>d</b> Видалити допис'
-        mark_muted: '<b>m</b>, <b>m</b> Ігнорувати сповіщення з теми'
-        mark_tracking: '<b>m</b>, <b>t</b> Стежити за темою'
-    badges:
-      title: Значок
-      badge_count:
-        one: "Значок"
-        few: "Значків: %{count} "
-        other: "Значків %{count}"
-      select_badge_for_title: Оберіть значок, що буде вашим званням
-      badge_grouping:
-        community:
-          name: Спільнота
-        other:
-          name: Інше
-      badge:
-        editor:
-          name: Редактор
-        basic_user:
-          description: <a href="https://meta.discourse.org/t/what-do-user-trust-levels-do/4924/4">Надані</a> всі основні функції спільноти
-        welcome:
-          name: Ласкаво просимо
-        autobiographer:
-          name: Автобіографіст
-        anniversary:
-          name: Річниця
-        nice_topic:
-          name: Непогана тема
-        good_topic:
-          name: Хороша тема
-        great_topic:
-          name: Чудова тема
-        first_link:
-          name: Перше посилання
-        first_quote:
-          name: Перша цитата
-        read_guidelines:
-          name: Читати інструкції
-        reader:
-          name: Читач

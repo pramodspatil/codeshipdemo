@@ -2,6 +2,7 @@ import { setting } from 'discourse/lib/computed';
 import CanCheckEmails from 'discourse/mixins/can-check-emails';
 import { popupAjaxError } from 'discourse/lib/ajax-error';
 import computed from "ember-addons/ember-computed-decorators";
+import { cook } from 'discourse/lib/text';
 
 export default Ember.Controller.extend(CanCheckEmails, {
 
@@ -32,8 +33,8 @@ export default Ember.Controller.extend(CanCheckEmails, {
     }
   },
 
-  cannotDeleteAccount: Em.computed.not('can_delete_account'),
-  deleteDisabled: Em.computed.or('saving', 'deleting', 'cannotDeleteAccount'),
+  cannotDeleteAccount: Em.computed.not('currentUser.can_delete_account'),
+  deleteDisabled: Em.computed.or('model.isSaving', 'deleting', 'cannotDeleteAccount'),
 
   canEditName: setting('enable_names'),
 
@@ -45,6 +46,12 @@ export default Ember.Controller.extend(CanCheckEmails, {
   @computed("model.has_title_badges")
   canSelectTitle(hasTitleBadges) {
     return this.siteSettings.enable_badges && hasTitleBadges;
+  },
+
+  @computed("model.can_change_bio")
+  canChangeBio(canChangeBio)
+  {
+    return canChangeBio;
   },
 
   @computed()
@@ -62,10 +69,41 @@ export default Ember.Controller.extend(CanCheckEmails, {
     return this.siteSettings.available_locales.split('|').map(s => ({ name: s, value: s }));
   },
 
-  digestFrequencies: [{ name: I18n.t('user.email_digests.daily'), value: 1 },
-                      { name: I18n.t('user.email_digests.every_three_days'), value: 3 },
-                      { name: I18n.t('user.email_digests.weekly'), value: 7 },
-                      { name: I18n.t('user.email_digests.every_two_weeks'), value: 14 }],
+  @computed()
+  frequencyEstimate() {
+    var estimate = this.get('model.mailing_list_posts_per_day');
+    if (!estimate || estimate < 2) {
+      return I18n.t('user.mailing_list_mode.few_per_day');
+    } else {
+      return I18n.t('user.mailing_list_mode.many_per_day', { dailyEmailEstimate: estimate });
+    }
+  },
+
+  @computed()
+  mailingListModeOptions() {
+    return [
+      {name: I18n.t('user.mailing_list_mode.daily'), value: 0},
+      {name: this.get('frequencyEstimate'), value: 1}
+    ];
+  },
+
+  previousRepliesOptions: [
+    {name: I18n.t('user.email_previous_replies.always'), value: 0},
+    {name: I18n.t('user.email_previous_replies.unless_emailed'), value: 1},
+    {name: I18n.t('user.email_previous_replies.never'), value: 2}
+  ],
+
+  digestFrequencies: [{ name: I18n.t('user.email_digests.every_30_minutes'), value: 30 },
+                      { name: I18n.t('user.email_digests.every_hour'), value: 60 },
+                      { name: I18n.t('user.email_digests.daily'), value: 1440 },
+                      { name: I18n.t('user.email_digests.every_three_days'), value: 4320 },
+                      { name: I18n.t('user.email_digests.weekly'), value: 10080 },
+                      { name: I18n.t('user.email_digests.every_two_weeks'), value: 20160 }],
+
+  likeNotificationFrequencies: [{ name: I18n.t('user.like_notification_frequency.always'), value: 0 },
+                      { name: I18n.t('user.like_notification_frequency.first_time_and_daily'), value: 1 },
+                      { name: I18n.t('user.like_notification_frequency.first_time'), value: 2 },
+                      { name: I18n.t('user.like_notification_frequency.never'), value: 3 }],
 
   autoTrackDurations: [{ name: I18n.t('user.auto_track_options.never'), value: -1 },
                        { name: I18n.t('user.auto_track_options.immediately'), value: 0 },
@@ -89,6 +127,12 @@ export default Ember.Controller.extend(CanCheckEmails, {
     return isSaving ? I18n.t('saving') : I18n.t('save');
   },
 
+  reset() {
+    this.setProperties({
+      passwordProgress: null
+    });
+  },
+
   passwordProgress: null,
 
   actions: {
@@ -97,6 +141,7 @@ export default Ember.Controller.extend(CanCheckEmails, {
       this.set('saved', false);
 
       const model = this.get('model');
+
       const userFields = this.get('userFields');
 
       // Update the user fields
@@ -111,11 +156,13 @@ export default Ember.Controller.extend(CanCheckEmails, {
 
       // Cook the bio for preview
       model.set('name', this.get('newNameInput'));
-      return model.save().then(() => {
+      var options = {};
+
+      return model.save(options).then(() => {
         if (Discourse.User.currentProp('id') === model.get('id')) {
           Discourse.User.currentProp('name', model.get('name'));
         }
-        model.set('bio_cooked', Discourse.Markdown.cook(Discourse.Markdown.sanitize(model.get('bio_raw'))));
+        model.set('bio_cooked', cook(model.get('bio_raw')));
         this.set('saved', true);
       }).catch(popupAjaxError);
     },

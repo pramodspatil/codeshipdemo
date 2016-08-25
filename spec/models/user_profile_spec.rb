@@ -1,9 +1,26 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe UserProfile do
   it 'is created automatically when a user is created' do
     user = Fabricate(:evil_trout)
     expect(user.user_profile).to be_present
+  end
+
+  context "url validation" do
+    let(:user) { Fabricate(:user) }
+    let(:upload) { Fabricate(:upload) }
+
+    it "ensures profile_background is valid" do
+      expect(Fabricate.build(:user_profile, user: user, profile_background: "---%")).not_to be_valid
+      expect(Fabricate.build(:user_profile, user: user, profile_background: "http://example.com/made-up.jpg")).not_to be_valid
+      expect(Fabricate.build(:user_profile, user: user, profile_background: upload.url)).to be_valid
+    end
+
+    it "ensures background_url is valid" do
+      expect(Fabricate.build(:user_profile, user: user, card_background: ";test")).not_to be_valid
+      expect(Fabricate.build(:user_profile, user: user, card_background: "http://example.com/no.jpg")).not_to be_valid
+      expect(Fabricate.build(:user_profile, user: user, card_background: upload.url)).to be_valid
+    end
   end
 
   describe 'rebaking' do
@@ -35,6 +52,18 @@ describe UserProfile do
     it "doesn't support really long bios" do
       user_profile = Fabricate.build(:user_profile_long)
       expect(user_profile).not_to be_valid
+    end
+
+    it "doesn't support invalid website" do
+      user_profile = Fabricate.build(:user_profile, website: "http://https://google.com")
+      user_profile.user = Fabricate.build(:user)
+      expect(user_profile).not_to be_valid
+    end
+
+    it "supports valid website" do
+      user_profile = Fabricate.build(:user_profile, website: "https://google.com")
+      user_profile.user = Fabricate.build(:user)
+      expect(user_profile.valid?).to be true
     end
 
     describe 'after save' do

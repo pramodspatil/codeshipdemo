@@ -1,3 +1,5 @@
+require_dependency 'notification_levels'
+
 class GroupUser < ActiveRecord::Base
   belongs_to :group, counter_cache: "user_count"
   belongs_to :user
@@ -9,6 +11,10 @@ class GroupUser < ActiveRecord::Base
   after_destroy :remove_primary_group
 
   after_save :grant_trust_level
+
+  def self.notification_levels
+    NotificationLevels.all
+  end
 
   protected
 
@@ -61,12 +67,13 @@ end
 #
 # Table name: group_users
 #
-#  id         :integer          not null, primary key
-#  group_id   :integer          not null
-#  user_id    :integer          not null
-#  created_at :datetime         not null
-#  updated_at :datetime         not null
-#  owner      :boolean          default(FALSE), not null
+#  id                 :integer          not null, primary key
+#  group_id           :integer          not null
+#  user_id            :integer          not null
+#  created_at         :datetime         not null
+#  updated_at         :datetime         not null
+#  owner              :boolean          default(FALSE), not null
+#  notification_level :integer          default(2), not null
 #
 # Indexes
 #

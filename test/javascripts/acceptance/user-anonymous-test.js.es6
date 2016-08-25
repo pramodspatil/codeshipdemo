@@ -15,28 +15,21 @@ function hasTopicList() {
   });
 }
 
-test("Filters", () => {
-  expect(14);
-
+test("Root URL", () => {
   visit("/users/eviltrout");
+  andThen(() => {
+    equal(currentPath(), 'user.userActivity.index', "it defaults to activity");
+  });
+});
+
+test("Filters", () => {
+  visit("/users/eviltrout/activity");
   hasStream();
 
   visit("/users/eviltrout/activity/topics");
   hasTopicList();
 
-  visit("/users/eviltrout/activity/posts");
-  hasStream();
-
   visit("/users/eviltrout/activity/replies");
-  hasStream();
-
-  visit("/users/eviltrout/activity/likes-given");
-  hasStream();
-
-  visit("/users/eviltrout/activity/likes-received");
-  hasStream();
-
-  visit("/users/eviltrout/activity/edits");
   hasStream();
 });
 

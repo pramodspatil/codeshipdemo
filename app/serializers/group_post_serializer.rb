@@ -6,6 +6,7 @@ class GroupPostSerializer < ApplicationSerializer
              :url,
              :user_title,
              :user_long_name,
+             :topic,
              :category
 
   has_one :user, serializer: BasicUserSerializer, embed: :objects
@@ -26,8 +27,17 @@ class GroupPostSerializer < ApplicationSerializer
     SiteSetting.enable_names?
   end
 
+  def topic
+    object.topic
+  end
+
+  def cooked
+    fragment = Nokogiri::HTML.fragment(object.cooked)
+    DiscourseEvent.trigger(:reduce_cooked, fragment, object)
+    fragment.to_html
+  end
+
   def category
     object.topic.category
   end
 end
-

@@ -1,12 +1,20 @@
 require_dependency 'rate_limiter'
 
 class AboutController < ApplicationController
-  skip_before_filter :check_xhr, only: [:show]
+  skip_before_filter :check_xhr, only: [:index]
   before_filter :ensure_logged_in, only: [:live_post_counts]
 
   def index
     @about = About.new
-    render_serialized(@about, AboutSerializer)
+
+    respond_to do |format|
+      format.html do
+        render :index
+      end
+      format.json do
+        render_serialized(@about, AboutSerializer)
+      end
+    end
   end
 
   def live_post_counts

@@ -4,8 +4,6 @@ class TrustLevel3Requirements
 
   include ActiveModel::Serialization
 
-  TIME_PERIOD = 100 # days
-
   LOW_WATER_MARK = 0.9
 
   attr_accessor :days_visited, :min_days_visited,
@@ -60,6 +58,10 @@ class TrustLevel3Requirements
     num_likes_received_days < min_likes_received_days * LOW_WATER_MARK
   end
 
+  def time_period
+    SiteSetting.tl3_time_period
+  end
+
   def trust_level_locked
     @user.trust_level_locked
   end
@@ -69,7 +71,7 @@ class TrustLevel3Requirements
   end
 
   def days_visited
-    @user.user_visits.where("visited_at > ? and posts_read > 0", TIME_PERIOD.days.ago).count
+    @user.user_visits.where("visited_at > ? and posts_read > 0", time_period.days.ago).count
   end
 
   def min_days_visited
@@ -77,7 +79,7 @@ class TrustLevel3Requirements
   end
 
   def num_topics_replied_to
-    @user.posts.select('distinct topic_id').where('created_at > ? AND post_number > 1', TIME_PERIOD.days.ago).count
+    @user.posts.select('distinct topic_id').where('created_at > ? AND post_number > 1', time_period.days.ago).count
   end
 
   def min_topics_replied_to
@@ -89,19 +91,25 @@ class TrustLevel3Requirements
   end
 
   def topics_viewed
-    topics_viewed_query.where('viewed_at > ?', TIME_PERIOD.days.ago).count
+    topics_viewed_query.where('viewed_at > ?', time_period.days.ago).count
   end
 
   def min_topics_viewed
-    (TrustLevel3Requirements.num_topics_in_time_period.to_i * (SiteSetting.tl3_requires_topics_viewed.to_f / 100.0)).round
+    [
+      (TrustLevel3Requirements.num_topics_in_time_period.to_i * (SiteSetting.tl3_requires_topics_viewed.to_f / 100.0)).round,
+      SiteSetting.tl3_requires_topics_viewed_cap
+    ].min
   end
 
   def posts_read
-    @user.user_visits.where('visited_at > ?', TIME_PERIOD.days.ago).pluck(:posts_read).sum
+    @user.user_visits.where('visited_at > ?', time_period.days.ago).pluck(:posts_read).sum
   end
 
   def min_posts_read
-    (TrustLevel3Requirements.num_posts_in_time_period.to_i * (SiteSetting.tl3_requires_posts_read.to_f / 100.0)).round
+    [
+      (TrustLevel3Requirements.num_posts_in_time_period.to_i * (SiteSetting.tl3_requires_posts_read.to_f / 100.0)).round,
+      SiteSetting.tl3_requires_posts_read_cap
+    ].min
   end
 
   def topics_viewed_all_time
@@ -147,7 +155,7 @@ class TrustLevel3Requirements
   end
 
   def num_likes_given
-    UserAction.where(user_id: @user.id, action_type: UserAction::LIKE).where('created_at > ?', TIME_PERIOD.days.ago).count
+    UserAction.where(user_id: @user.id, action_type: UserAction::LIKE).where('created_at > ?', time_period.days.ago).count
   end
 
   def min_likes_given
@@ -155,7 +163,7 @@ class TrustLevel3Requirements
   end
 
   def num_likes_received_query
-    UserAction.where(user_id: @user.id, action_type: UserAction::WAS_LIKED).where('created_at > ?', TIME_PERIOD.days.ago)
+    UserAction.where(user_id: @user.id, action_type: UserAction::WAS_LIKED).where('created_at > ?', time_period.days.ago)
   end
 
   def num_likes_received
@@ -172,7 +180,9 @@ class TrustLevel3Requirements
   end
 
   def min_likes_received_days
-    (min_likes_received.to_f / 3.0).ceil
+    # Since min_likes_received / 3 can be greater than the number of days in time_period,
+    # cap this result to be less than time_period.
+    [(min_likes_received.to_f / 3.0).ceil, (0.75 * time_period.to_f).ceil].min
   end
 
   def num_likes_received_users
@@ -197,7 +207,7 @@ class TrustLevel3Requirements
 
   def self.num_topics_in_time_period
     $redis.get(NUM_TOPICS_KEY) || begin
-      count = Topic.listable_topics.visible.created_since(TIME_PERIOD.days.ago).count
+      count = Topic.listable_topics.visible.created_since(SiteSetting.tl3_time_period.days.ago).count
       $redis.setex NUM_TOPICS_KEY, CACHE_DURATION, count
       count
     end
@@ -205,7 +215,7 @@ class TrustLevel3Requirements
 
   def self.num_posts_in_time_period
     $redis.get(NUM_POSTS_KEY) || begin
-      count = Post.public_posts.visible.created_since(TIME_PERIOD.days.ago).count
+      count = Post.public_posts.visible.created_since(SiteSetting.tl3_time_period.days.ago).count
       $redis.setex NUM_POSTS_KEY, CACHE_DURATION, count
       count
     end
@@ -214,7 +224,7 @@ class TrustLevel3Requirements
   def flagged_post_ids
     @_flagged_post_ids ||= @user.posts
                                 .with_deleted
-                                .where('created_at > ? AND (spam_count > 0 OR inappropriate_count > 0)', TIME_PERIOD.days.ago)
+                                .where('created_at > ? AND (spam_count > 0 OR inappropriate_count > 0)', time_period.days.ago)
                                 .pluck(:id)
   end
 end

@@ -10,13 +10,13 @@
     <div class="control-group">
       <label class="control-label"></label>
       <div class="controls">
-        {{combo-box valueAttribute="id" value=selectedUserBadgeId nameProperty="badge.displayName" content=selectableUserBadges}}
+        {{combo-box valueAttribute="id" value=selectedUserBadgeId nameProperty="badge.name" content=selectableUserBadges}}
       </div>
     </div>
 
     <div class="control-group">
       <div class="controls">
-        <button class="btn btn-primary" {{bind-attr disabled=disableSave}} {{action "save"}}>{{savingStatus}}</button>
+        <button class="btn btn-primary" disabled={{disableSave}} {{action "save"}}>{{savingStatus}}</button>
         {{#if saved}}{{i18n 'saved'}}{{/if}}
       </div>
     </div>

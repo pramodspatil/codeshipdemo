@@ -56,6 +56,10 @@
     }
   }
 
+  .delete-account {
+    overflow: hidden;
+  }
+
   .checkbox-label {
     overflow: auto;
     display: block;
@@ -67,9 +71,8 @@
 }
 
 .profile-image {
-  height: 150px;
+  height: 25px;
   width: 100%;
-  background-size: cover;
 }
 
 
@@ -131,6 +134,7 @@
 .user-navigation {
   width: 100%;
   margin-top: 20px;
+  min-height: 20px;
 
   h3 {
     color: $primary;
@@ -140,11 +144,6 @@
 }
 
 .user-main {
-
-  width: 100%;
-  float: left;
-  margin-bottom: 50px;
-
 
   table.group-members {
     width: 100%;
@@ -170,18 +169,15 @@
         color: $primary;
       }
     }
-    .user-small {
+    .user-info {
       width: 245px;
     }
   }
 
   .user-content {
-    padding: 10px 8px;
     background-color: $secondary;
-    border: 1px solid dark-light-diff($primary, $secondary, 90%, -60%);
-    margin-bottom: 10px;
     box-sizing: border-box;
-    margin-top: 20px;
+    margin-top: 10px;
 
     .btn.right {
       float: right
@@ -209,8 +205,7 @@
   }
 
   .about {
-    background-size: cover;
-    background: dark-light-diff($primary, $secondary, 0%, -75%) center center;
+    background: dark-light-diff($primary, $secondary, 0%, -75%) center;
     width: 100%;
     margin-bottom: 10px;
     overflow: hidden;
@@ -249,8 +244,12 @@
 
     .details {
       padding: 15px 10px 4px 10px;
-      background-color: dark-light-choose(rgba($primary, .9), rgba($secondary, .9));
-      opacity: 0.8;
+      background: rgba($secondary, .85);
+
+      blockquote {
+        background-color: dark-light-diff($secondary, $primary, 30%, -70%);
+        border-left-color: dark-light-diff($secondary, $primary, 50%, -50%);
+      }
 
       h1 {
         font-size: 2.143em;
@@ -294,25 +293,25 @@
         width: 100%;
         position: relative;
         float: left;
-        color: dark-light-choose(scale-color($secondary, $lightness: 75%), blend-primary-secondary(90%));
+        color: $primary;
 
         h1 {font-weight: bold;}
 
         .primary-textual {
           float: left;
+          padding-left: 15px;
           a[href] {
-            color: dark-light-diff($secondary, $primary, 75%, -10%);
+            color: $primary;
           }
         }
 
         .bio {
-          color: dark-light-diff($secondary, $primary, 75%, 0%);
+          color: $primary;
           max-height: 300px;
           overflow: auto;
           max-width: 700px;
 
           a[href] {
-            color: dark-light-diff($secondary, $primary, 75%, 0%);
             text-decoration: underline;
           }
 
@@ -324,16 +323,15 @@
     }
 
     .controls {
-      width: 160px;
-      float: right;
-      text-align: right;
+      float: left;
+      padding-left: 15px;
       ul {
         list-style-type: none;
         margin: 0;
       }
       a {
         padding: 5px 10px;
-        width: 140px;
+        width: 120px;
         margin-bottom: 10px;
       }
     }
@@ -357,7 +355,7 @@
     .details {
       padding: 12px 15px 2px 15px;
       margin-top: 0;
-      background: dark-light-choose(rgba($primary, 1), blend-primary-secondary(5%));
+      background: rgba($secondary, .85);
       .bio { display: none; }
 
       .primary {
@@ -390,7 +388,6 @@
 
 
   .user-stream {
-    padding: 0 10px;
     .excerpt {
       margin: 5px 0;
       font-size: 0.929em;
@@ -491,6 +488,9 @@
         color: dark-light-choose(scale-color($primary, $lightness: 50%), scale-color($secondary, $lightness: 50%));
       }
     }
+    .topic-statuses {
+      float: left;
+    }
   }
 
   .staff-counters {
@@ -590,6 +590,32 @@
   display: inline-block;
 }
 
-.notification-buttons {
-  display: inline-block;
+// mobile fixups for badges
+
+.badge-card.medium {
+  width: 300px;
+}
+
+.show-badge-details {
+  margin-bottom: 1em;
+}
+
+.user-badges {
+  margin-bottom: 2em;
+}
+
+.show-badge-details .badge-grant-info {
+  display: none;
+}
+
+.user-info.medium {
+  width: 300px;
+}
+
+.user-info.medium .user-detail {
+  width: 240px;
+}
+
+.user-info.medium .user-image {
+  width: auto;
 }

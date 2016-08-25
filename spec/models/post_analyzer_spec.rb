@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe PostAnalyzer do
 
@@ -17,6 +17,7 @@ describe PostAnalyzer do
     it 'fetches the cached onebox for any urls in the post' do
       Oneboxer.expects(:cached_onebox).with url
       post_analyzer.cook(*args)
+      expect(post_analyzer.found_oneboxes?).to be(true)
     end
 
     it 'does not invalidate the onebox cache' do
@@ -153,6 +154,8 @@ describe PostAnalyzer do
 
     it "finds links from HTML" do
       post_analyzer = PostAnalyzer.new(raw_post_two_links_html, default_topic_id)
+      post_analyzer.cook(raw_post_two_links_html, {})
+      expect(post_analyzer.found_oneboxes?).to be(false)
       expect(post_analyzer.link_count).to eq(2)
     end
   end
@@ -204,6 +207,16 @@ describe PostAnalyzer do
     it "handles underscore in username" do
       post_analyzer = PostAnalyzer.new("@Jake @Finn @Jake_Old", default_topic_id)
       expect(post_analyzer.raw_mentions).to eq(['jake', 'finn', 'jake_old'])
+    end
+
+    it "handles hyphen in groupname" do
+      post_analyzer = PostAnalyzer.new("@org-board", default_topic_id)
+      expect(post_analyzer.raw_mentions).to eq(['org-board'])
+    end
+
+    it "ignores emails" do
+      post_analyzer = PostAnalyzer.new("1@test.com 1@best.com @best @not", default_topic_id)
+      expect(post_analyzer.raw_mentions).to eq(['best', 'not'])
     end
   end
 end

@@ -1,6 +1,9 @@
+import { ajax } from 'discourse/lib/ajax';
 import ModalFunctionality from 'discourse/mixins/modal-functionality';
 import showModal from 'discourse/lib/show-modal';
 import { setting } from 'discourse/lib/computed';
+import { findAll } from 'discourse/models/login-method';
+import { escape } from 'pretty-text/sanitizer';
 
 // This is happening outside of the app via popup
 const AuthErrors =
@@ -22,12 +25,10 @@ export default Ember.Controller.extend(ModalFunctionality, {
     this.set('loggedIn', false);
   },
 
-  /**
-   Determines whether at least one login button is enabled
-  **/
+  // Determines whether at least one login button is enabled
   hasAtLeastOneLoginButton: function() {
-    return Em.get("Discourse.LoginMethod.all").length > 0;
-  }.property("Discourse.LoginMethod.all.@each"),
+    return findAll(this.siteSettings).length > 0;
+  }.property(),
 
   loginButtonText: function() {
     return this.get('loggingIn') ? I18n.t('login.logging_in') : I18n.t('login.title');
@@ -56,19 +57,22 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
       this.set('loggingIn', true);
 
-      Discourse.ajax("/session", {
+      ajax("/session", {
         data: { login: this.get('loginName'), password: this.get('loginPassword') },
         type: 'POST'
       }).then(function (result) {
         // Successful login
         if (result.error) {
           self.set('loggingIn', false);
-          if( result.reason === 'not_activated' ) {
+          if (result.reason === 'not_activated') {
             self.send('showNotActivated', {
               username: self.get('loginName'),
-              sentTo: result.sent_to_email,
-              currentEmail: result.current_email
+              sentTo: escape(result.sent_to_email),
+              currentEmail: escape(result.current_email)
             });
+          } else if (result.reason === 'suspended' ) {
+            self.send("closeModal");
+            bootbox.alert(result.error);
           } else {
             self.flash(result.error, 'error');
           }
@@ -81,7 +85,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
           const ssoDestinationUrl = $.cookie('sso_destination_url');
           $hidden_login_form.find('input[name=username]').val(self.get('loginName'));
           $hidden_login_form.find('input[name=password]').val(self.get('loginPassword'));
-          
+
           if (ssoDestinationUrl) {
             $.cookie('sso_destination_url', null);
             window.location.assign(ssoDestinationUrl);
@@ -96,7 +100,14 @@ export default Ember.Controller.extend(ModalFunctionality, {
           } else {
             $hidden_login_form.find('input[name=redirect]').val(window.location.href);
           }
-          $hidden_login_form.submit();
+
+          if (navigator.userAgent.match(/(iPad|iPhone|iPod)/g) && navigator.userAgent.match(/Safari/g)) {
+            // In case of Safari on iOS do not submit hidden login form
+            window.location.href = $hidden_login_form.find('input[name=redirect]').val();
+          } else {
+            $hidden_login_form.submit();
+          }
+          return;
         }
 
       }, function(e) {
@@ -119,7 +130,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
       if(customLogin){
         customLogin();
       } else {
-        var authUrl = Discourse.getURL("/auth/" + name);
+        const authUrl = loginMethod.get('customUrl') || Discourse.getURL("/auth/" + name);
         if (loginMethod.get("fullScreenLogin")) {
           window.location = authUrl;
         } else {
@@ -165,7 +176,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
   authMessage: (function() {
     if (Ember.isEmpty(this.get('authenticate'))) return "";
-    const method = Discourse.get('LoginMethod.all').findProperty("name", this.get("authenticate"));
+    const method = findAll(this.siteSettings, this.capabilities, this.isMobileDevice).findProperty("name", this.get("authenticate"));
     if(method){
       return method.get('message');
     }
@@ -196,10 +207,14 @@ export default Ember.Controller.extend(ModalFunctionality, {
     // Reload the page if we're authenticated
     if (options.authenticated) {
       const destinationUrl = $.cookie('destination_url');
+      const shouldRedirectToUrl = self.session.get("shouldRedirectToUrl");
       if (self.get('loginRequired') && destinationUrl) {
         // redirect client to the original URL
         $.cookie('destination_url', null);
         window.location.href = destinationUrl;
+      } else if (shouldRedirectToUrl) {
+        self.session.set("shouldRedirectToUrl", null);
+        window.location.href = shouldRedirectToUrl;
       } else if (window.location.pathname === Discourse.getURL('/login')) {
         window.location.pathname = Discourse.getURL('/');
       } else {

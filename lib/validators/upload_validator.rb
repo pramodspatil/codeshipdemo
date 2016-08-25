@@ -5,6 +5,11 @@ module Validators; end
 class Validators::UploadValidator < ActiveModel::Validator
 
   def validate(upload)
+    # check the attachment blacklist
+    if upload.is_attachment_for_group_message && SiteSetting.allow_all_attachments_for_group_messages
+      return upload.original_filename =~ SiteSetting.attachment_filename_blacklist_regex
+    end
+
     extension = File.extname(upload.original_filename)[1..-1] || ""
 
     if is_authorized?(upload, extension)

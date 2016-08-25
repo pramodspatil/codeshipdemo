@@ -2,6 +2,8 @@ import RestModel from 'discourse/models/rest';
 import { url } from 'discourse/lib/computed';
 import { on } from 'ember-addons/ember-computed-decorators';
 import computed from 'ember-addons/ember-computed-decorators';
+import UserActionGroup from 'discourse/models/user-action-group';
+import { postUrl } from 'discourse/lib/utilities';
 
 const UserActionTypes = {
   likes_given: 1,
@@ -35,7 +37,7 @@ const UserAction = RestModel.extend({
 
   @computed("action_type")
   descriptionKey(action) {
-    if (action === null || Discourse.UserAction.TO_SHOW.indexOf(action) >= 0) {
+    if (action === null || UserAction.TO_SHOW.indexOf(action) >= 0) {
       if (this.get('isPM')) {
         return this.get('sameUser') ? 'sent_by_you' : 'sent_by_user';
       } else {
@@ -88,12 +90,12 @@ const UserAction = RestModel.extend({
 
   @computed()
   postUrl() {
-    return Discourse.Utilities.postUrl(this.get('slug'), this.get('topic_id'), this.get('post_number'));
+    return postUrl(this.get('slug'), this.get('topic_id'), this.get('post_number'));
   },
 
   @computed()
   replyUrl() {
-    return Discourse.Utilities.postUrl(this.get('slug'), this.get('topic_id'), this.get('reply_to_post_number'));
+    return postUrl(this.get('slug'), this.get('topic_id'), this.get('reply_to_post_number'));
   },
 
   replyType: Em.computed.equal('action_type', UserActionTypes.replies),
@@ -111,10 +113,10 @@ const UserAction = RestModel.extend({
     let groups = this.get("childGroups");
     if (!groups) {
       groups = {
-        likes: Discourse.UserActionGroup.create({ icon: "fa fa-heart" }),
-        stars: Discourse.UserActionGroup.create({ icon: "fa fa-star" }),
-        edits: Discourse.UserActionGroup.create({ icon: "fa fa-pencil" }),
-        bookmarks: Discourse.UserActionGroup.create({ icon: "fa fa-bookmark" })
+        likes: UserActionGroup.create({ icon: "fa fa-heart" }),
+        stars: UserActionGroup.create({ icon: "fa fa-star" }),
+        edits: UserActionGroup.create({ icon: "fa fa-pencil" }),
+        bookmarks: UserActionGroup.create({ icon: "fa fa-bookmark" })
       };
     }
     this.set("childGroups", groups);
@@ -146,10 +148,10 @@ const UserAction = RestModel.extend({
     }
     return rval;
   }.property("childGroups",
-    "childGroups.likes.items", "childGroups.likes.items.@each",
-    "childGroups.stars.items", "childGroups.stars.items.@each",
-    "childGroups.edits.items", "childGroups.edits.items.@each",
-    "childGroups.bookmarks.items", "childGroups.bookmarks.items.@each"),
+    "childGroups.likes.items", "childGroups.likes.items.[]",
+    "childGroups.stars.items", "childGroups.stars.items.[]",
+    "childGroups.edits.items", "childGroups.edits.items.[]",
+    "childGroups.bookmarks.items", "childGroups.bookmarks.items.[]"),
 
   switchToActing() {
     this.setProperties({
@@ -171,7 +173,7 @@ UserAction.reopenClass({
       if (found === void 0) {
 
         let current;
-        if (Discourse.UserAction.TO_COLLAPSE.indexOf(item.action_type) >= 0) {
+        if (UserAction.TO_COLLAPSE.indexOf(item.action_type) >= 0) {
           current = UserAction.create(item);
           item.switchToActing();
           current.addChild(item);

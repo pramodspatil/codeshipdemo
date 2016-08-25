@@ -1,3 +1,4 @@
+import { ajax } from 'discourse/lib/ajax';
 import RestModel from 'discourse/models/rest';
 import ResultSet from 'discourse/models/result-set';
 
@@ -37,7 +38,9 @@ function findAndRemoveMap(type, id) {
 flushMap();
 
 export default Ember.Object.extend({
-  _plurals: {},
+  _plurals: {'post-reply': 'post-replies',
+             'post-reply-history': 'post_reply_histories'},
+
   pluralize(thing) {
     return this._plurals[thing] || thing + "s";
   },
@@ -63,7 +66,7 @@ export default Ember.Object.extend({
 
   _hydrateFindResults(result, type, findArgs) {
     if (typeof findArgs === "object") {
-      return this._resultSet(type, result);
+      return this._resultSet(type, result, findArgs);
     } else {
       return this._hydrate(type, result[Ember.String.underscore(type)], result);
     }
@@ -73,24 +76,48 @@ export default Ember.Object.extend({
   // refresh it in the background.
   findStale(type, findArgs, opts) {
     const stale = this.adapterFor(type).findStale(this, type, findArgs, opts);
-    if (stale.hasResults) {
-      stale.results = this._hydrateFindResults(stale.results, type, findArgs);
-    }
-    stale.refresh = () => this.find(type, findArgs, opts);
-    return stale;
+    return {
+      hasResults: (stale !== undefined),
+      results: stale,
+      refresh: () => this.find(type, findArgs, opts)
+    };
   },
 
   find(type, findArgs, opts) {
-    return this.adapterFor(type).find(this, type, findArgs, opts).then((result) => {
-      return this._hydrateFindResults(result, type, findArgs, opts);
+    var adapter = this.adapterFor(type);
+    return adapter.find(this, type, findArgs, opts).then(result => {
+      var hydrated = this._hydrateFindResults(result, type, findArgs, opts);
+      if (adapter.cache) {
+        const stale = adapter.findStale(this, type, findArgs, opts);
+        hydrated = this._updateStale(stale, hydrated);
+        adapter.cacheFind(this, type, findArgs, opts, hydrated);
+      }
+      return hydrated;
     });
+  },
+
+  _updateStale(stale, hydrated) {
+    if (!stale) {
+      return hydrated;
+    }
+
+    hydrated.set('content', hydrated.get('content').map((item) => {
+      var staleItem = stale.content.findBy('id', item.get('id'));
+      if (staleItem) {
+        staleItem.setProperties(item);
+      } else {
+        staleItem = item;
+      }
+      return staleItem;
+    }));
+    return hydrated;
   },
 
   refreshResults(resultSet, type, url) {
     const self = this;
-    return Discourse.ajax(url).then(function(result) {
-      const typeName = Ember.String.underscore(self.pluralize(type)),
-            content = result[typeName].map(obj => self._hydrate(type, obj, result));
+    return ajax(url).then(result => {
+      const typeName = Ember.String.underscore(self.pluralize(type));
+      const content = result[typeName].map(obj => self._hydrate(type, obj, result));
       resultSet.set('content', content);
     });
   },
@@ -98,7 +125,7 @@ export default Ember.Object.extend({
   appendResults(resultSet, type, url) {
     const self = this;
 
-    return Discourse.ajax(url).then(function(result) {
+    return ajax(url).then(function(result) {
       const typeName = Ember.String.underscore(self.pluralize(type)),
             totalRows = result["total_rows_" + typeName] || result.get('totalRows'),
             loadMoreUrl = result["load_more_" + typeName],
@@ -142,14 +169,25 @@ export default Ember.Object.extend({
     });
   },
 
-  _resultSet(type, result) {
-    const typeName = Ember.String.underscore(this.pluralize(type)),
-          content = result[typeName].map(obj => this._hydrate(type, obj, result)),
-          totalRows = result["total_rows_" + typeName] || content.length,
-          loadMoreUrl = result["load_more_" + typeName],
-          refreshUrl = result['refresh_' + typeName];
+  _resultSet(type, result, findArgs) {
+    const typeName = Ember.String.underscore(this.pluralize(type));
+    const content = result[typeName].map(obj => this._hydrate(type, obj, result));
 
-    return ResultSet.create({ content, totalRows, loadMoreUrl, refreshUrl, store: this, __type: type });
+    const createArgs = {
+      content,
+      findArgs,
+      totalRows: result["total_rows_" + typeName] || content.length,
+      loadMoreUrl: result["load_more_" + typeName],
+      refreshUrl: result['refresh_' + typeName],
+      store: this,
+      __type: type
+    };
+
+    if (result.extras) {
+      createArgs.extras = result.extras;
+    }
+
+    return ResultSet.create(createArgs);
   },
 
   _build(type, obj) {
@@ -160,6 +198,7 @@ export default Ember.Object.extend({
     // TODO: Have injections be automatic
     obj.topicTrackingState = this.container.lookup('topic-tracking-state:main');
     obj.keyValueStore = this.container.lookup('key-value-store:main');
+    obj.siteSettings = this.container.lookup('site-settings:main');
 
     const klass = this.container.lookupFactory('model:' + type) || RestModel;
     const model = klass.create(obj);
@@ -231,7 +270,9 @@ export default Ember.Object.extend({
 
   _hydrate(type, obj, root) {
     if (!obj) { throw "Can't hydrate " + type + " of `null`"; }
-    if (!obj.id) { throw "Can't hydrate " + type + " without an `id`"; }
+
+    const id = obj.id;
+    if (!id) { throw "Can't hydrate " + type + " without an `id`"; }
 
     root = root || obj;
 
@@ -241,13 +282,14 @@ export default Ember.Object.extend({
       this._hydrateEmbedded(type, obj, root);
     }
 
-    const existing = fromMap(type, obj.id);
+    const existing = fromMap(type, id);
     if (existing === obj) { return existing; }
 
     if (existing) {
       delete obj.id;
       const klass = this.container.lookupFactory('model:' + type) || RestModel;
       existing.setProperties(klass.munge(obj));
+      obj.id = id;
       return existing;
     }
 

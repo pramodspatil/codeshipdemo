@@ -92,13 +92,54 @@
       <label for="grant_trust_level">{{i18n 'groups.trust_levels.title'}}</label>
       {{combo-box name="grant_trust_level" valueAttribute="value" value=model.grant_trust_level content=trustLevelOptions}}
     </div>
+
+    {{#if siteSettings.email_in}}
+      {{#plugin-outlet "group-email-in"}}
+        <label for="incoming_email">{{i18n 'admin.groups.incoming_email'}}</label>
+        {{text-field name="incoming_email" value=model.incoming_email placeholderKey="admin.groups.incoming_email_placeholder"}}
+      {{/plugin-outlet}}
+    {{/if}}
+  {{/unless}}
+
+  {{#unless model.automatic}}
+    <div class="flair_inputs">
+      <div class="flair_left">
+        <div>
+          <label for="flair_url">{{i18n 'admin.groups.flair_url'}}</label>
+          {{text-field name="flair_url" value=model.flair_url placeholderKey="admin.groups.flair_url_placeholder"}}
+        </div>
+
+        <div>
+          <label for="flair_bg_color">{{i18n 'admin.groups.flair_bg_color'}}</label>
+          {{text-field name="flair_bg_color" class="flair_bg_color" value=model.flair_bg_color placeholderKey="admin.groups.flair_bg_color_placeholder"}}
+        </div>
+      </div>
+
+      {{#if flairPreviewStyle}}
+        <div class="flair_right">
+          <div>
+            <label>{{i18n 'admin.groups.flair_preview'}}</label>
+            <div class="avatar-flair-preview">
+              <div class="avatar-wrapper">
+                <img alt width="45" height="45" src="{{demoAvatarUrl}}" class="avatar actor">
+              </div>
+              <div class="avatar-flair demo {{flairPreviewClasses}}" style={{flairPreviewStyle}}></div>
+            </div>
+          </div>
+        </div>
+      {{/if}}
+
+      <div class="clearfix"></div>
+    </div>
   {{/unless}}
 
   <div class='buttons'>
-    <button {{action "save"}} {{bind-attr disabled="disableSave"}} class='btn btn-primary'>{{i18n 'admin.customize.save'}}</button>
+    <button {{action "save"}} disabled={{disableSave}} class='btn btn-primary'>{{i18n 'admin.customize.save'}}</button>
     {{#unless model.automatic}}
       <button {{action "destroy"}} class='btn btn-danger'>{{fa-icon "trash-o"}}{{i18n 'admin.customize.delete'}}</button>
     {{/unless}}
+
+    <span class="saving {{unless savingStatus 'hidden'}}">{{savingStatus}}</span>
   </div>
 
 </form>

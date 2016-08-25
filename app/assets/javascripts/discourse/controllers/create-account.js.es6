@@ -1,7 +1,10 @@
+import { ajax } from 'discourse/lib/ajax';
 import debounce from 'discourse/lib/debounce';
 import ModalFunctionality from 'discourse/mixins/modal-functionality';
 import { setting } from 'discourse/lib/computed';
 import { on } from 'ember-addons/ember-computed-decorators';
+import { emailValid } from 'discourse/lib/utilities';
+import InputValidation from 'discourse/models/input-validation';
 
 export default Ember.Controller.extend(ModalFunctionality, {
   needs: ['login'],
@@ -16,6 +19,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
   rejectedPasswords: Em.A([]),
   prefilledUsername: null,
   userFields: null,
+  isDeveloper: false,
 
   hasAuthOptions: Em.computed.notEmpty('authOptions'),
   canCreateLocal: setting('enable_local_logins'),
@@ -37,12 +41,13 @@ export default Ember.Controller.extend(ModalFunctionality, {
       rejectedEmails: [],
       rejectedPasswords: [],
       prefilledUsername: null,
+      isDeveloper: false
     });
     this._createUserFields();
   },
 
   submitDisabled: function() {
-    if (!this.get('passwordRequired')) return false; // 3rd party auth
+    if (!this.get('emailValidation.failed') && !this.get('passwordRequired')) return false; // 3rd party auth
     if (this.get('formSubmitted')) return true;
     if (this.get('nameValidation.failed')) return true;
     if (this.get('emailValidation.failed')) return true;
@@ -65,13 +70,17 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
   usernameRequired: Ember.computed.not('authOptions.omit_username'),
 
+  fullnameRequired: function() {
+    return this.get('siteSettings.full_name_required') || this.get('siteSettings.enable_names');
+  }.property(),
+
   passwordRequired: function() {
     return Ember.isEmpty(this.get('authOptions.auth_provider'));
   }.property('authOptions.auth_provider'),
 
   passwordInstructions: function() {
-    return I18n.t('user.password.instructions', {count: Discourse.SiteSettings.min_password_length});
-  }.property(),
+    return this.get('isDeveloper') ? I18n.t('user.password.instructions', {count: Discourse.SiteSettings.min_admin_password_length}) : I18n.t('user.password.instructions', {count: Discourse.SiteSettings.min_password_length});
+  }.property('isDeveloper'),
 
   nameInstructions: function() {
     return I18n.t(Discourse.SiteSettings.full_name_required ? 'user.name.instructions_required' : 'user.name.instructions');
@@ -80,10 +89,10 @@ export default Ember.Controller.extend(ModalFunctionality, {
   // Validate the name.
   nameValidation: function() {
     if (Discourse.SiteSettings.full_name_required && Ember.isEmpty(this.get('accountName'))) {
-      return Discourse.InputValidation.create({ failed: true });
+      return InputValidation.create({ failed: true });
     }
 
-    return Discourse.InputValidation.create({ok: true});
+    return InputValidation.create({ok: true});
   }.property('accountName'),
 
   // Check the email address
@@ -91,7 +100,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
     // If blank, fail without a reason
     let email;
     if (Ember.isEmpty(this.get('accountEmail'))) {
-      return Discourse.InputValidation.create({
+      return InputValidation.create({
         failed: true
       });
     }
@@ -99,37 +108,44 @@ export default Ember.Controller.extend(ModalFunctionality, {
     email = this.get("accountEmail");
 
     if (this.get('rejectedEmails').contains(email)) {
-      return Discourse.InputValidation.create({
+      return InputValidation.create({
         failed: true,
         reason: I18n.t('user.email.invalid')
       });
     }
 
     if ((this.get('authOptions.email') === email) && this.get('authOptions.email_valid')) {
-      return Discourse.InputValidation.create({
+      return InputValidation.create({
         ok: true,
         reason: I18n.t('user.email.authenticated', {
-          provider: this.get('authOptions.auth_provider')
+          provider: this.authProviderDisplayName(this.get('authOptions.auth_provider'))
         })
       });
     }
 
-    if (Discourse.Utilities.emailValid(email)) {
-      return Discourse.InputValidation.create({
+    if (emailValid(email)) {
+      return InputValidation.create({
         ok: true,
         reason: I18n.t('user.email.ok')
       });
     }
 
-    return Discourse.InputValidation.create({
+    return InputValidation.create({
       failed: true,
       reason: I18n.t('user.email.invalid')
     });
-  }.property('accountEmail', 'rejectedEmails.@each'),
+  }.property('accountEmail', 'rejectedEmails.[]'),
 
   emailValidated: function() {
     return this.get('authOptions.email') === this.get("accountEmail") && this.get('authOptions.email_valid');
   }.property('accountEmail', 'authOptions.email', 'authOptions.email_valid'),
+
+  authProviderDisplayName(provider) {
+    switch(provider) {
+      case "Google_oauth2": return "Google";
+      default: return provider;
+    }
+  },
 
   prefillUsername: function() {
     if (this.get('prefilledUsername')) {
@@ -162,15 +178,15 @@ export default Ember.Controller.extend(ModalFunctionality, {
     if (this.usernameNeedsToBeValidatedWithEmail()) {
       if (this.get('emailValidation.failed')) {
         if (this.shouldCheckUsernameMatch()) {
-          return this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
+          return this.set('uniqueUsernameValidation', InputValidation.create({
             failed: true,
             reason: I18n.t('user.username.enter_email')
           }));
         } else {
-          return this.set('uniqueUsernameValidation', Discourse.InputValidation.create({ failed: true }));
+          return this.set('uniqueUsernameValidation', InputValidation.create({ failed: true }));
         }
       } else if (this.shouldCheckUsernameMatch()) {
-        this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
+        this.set('uniqueUsernameValidation', InputValidation.create({
           failed: true,
           reason: I18n.t('user.username.checking')
         }));
@@ -183,7 +199,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
     this.set('uniqueUsernameValidation', null);
 
     if (this.get('accountUsername') === this.get('prefilledUsername')) {
-      return Discourse.InputValidation.create({
+      return InputValidation.create({
         ok: true,
         reason: I18n.t('user.username.prefilled')
       });
@@ -191,14 +207,14 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
     // If blank, fail without a reason
     if (Ember.isEmpty(this.get('accountUsername'))) {
-      return Discourse.InputValidation.create({
+      return InputValidation.create({
         failed: true
       });
     }
 
     // If too short
     if (this.get('accountUsername').length < Discourse.SiteSettings.min_username_length) {
-      return Discourse.InputValidation.create({
+      return InputValidation.create({
         failed: true,
         reason: I18n.t('user.username.too_short')
       });
@@ -206,7 +222,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
     // If too long
     if (this.get('accountUsername').length > this.get('maxUsernameLength')) {
-      return Discourse.InputValidation.create({
+      return InputValidation.create({
         failed: true,
         reason: I18n.t('user.username.too_long')
       });
@@ -214,7 +230,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
     this.checkUsernameAvailability();
     // Let's check it out asynchronously
-    return Discourse.InputValidation.create({
+    return InputValidation.create({
       failed: true,
       reason: I18n.t('user.username.checking')
     });
@@ -228,42 +244,28 @@ export default Ember.Controller.extend(ModalFunctionality, {
     const _this = this;
     if (this.shouldCheckUsernameMatch()) {
       return Discourse.User.checkUsername(this.get('accountUsername'), this.get('accountEmail')).then(function(result) {
-        _this.set('globalNicknameExists', false);
+        _this.set('isDeveloper', false);
         if (result.available) {
-          if (result.global_match) {
-            _this.set('globalNicknameExists', true);
-            return _this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
-              ok: true,
-              reason: I18n.t('user.username.global_match')
-            }));
-          } else {
-            return _this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
-              ok: true,
-              reason: I18n.t('user.username.available')
-            }));
+          if (result.is_developer) {
+            _this.set('isDeveloper', true);
           }
+          return _this.set('uniqueUsernameValidation', InputValidation.create({
+            ok: true,
+            reason: I18n.t('user.username.available')
+          }));
         } else {
           if (result.suggestion) {
-            if (result.global_match !== void 0 && result.global_match === false) {
-              _this.set('globalNicknameExists', true);
-              return _this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
-                failed: true,
-                reason: I18n.t('user.username.global_mismatch', result)
-              }));
-            } else {
-              return _this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
-                failed: true,
-                reason: I18n.t('user.username.not_available', result)
-              }));
-            }
+            return _this.set('uniqueUsernameValidation', InputValidation.create({
+              failed: true,
+              reason: I18n.t('user.username.not_available', result)
+            }));
           } else if (result.errors) {
-            return _this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
+            return _this.set('uniqueUsernameValidation', InputValidation.create({
               failed: true,
               reason: result.errors.join(' ')
             }));
           } else {
-            _this.set('globalNicknameExists', true);
-            return _this.set('uniqueUsernameValidation', Discourse.InputValidation.create({
+            return _this.set('uniqueUsernameValidation', InputValidation.create({
               failed: true,
               reason: I18n.t('user.username.enter_email')
             }));
@@ -287,54 +289,55 @@ export default Ember.Controller.extend(ModalFunctionality, {
   // Validate the password
   passwordValidation: function() {
     if (!this.get('passwordRequired')) {
-      return Discourse.InputValidation.create({ ok: true });
+      return InputValidation.create({ ok: true });
     }
 
     // If blank, fail without a reason
     const password = this.get("accountPassword");
     if (Ember.isEmpty(this.get('accountPassword'))) {
-      return Discourse.InputValidation.create({ failed: true });
+      return InputValidation.create({ failed: true });
     }
 
     // If too short
-    if (password.length < Discourse.SiteSettings.min_password_length) {
-      return Discourse.InputValidation.create({
+    const passwordLength = this.get('isDeveloper') ? Discourse.SiteSettings.min_admin_password_length : Discourse.SiteSettings.min_password_length;
+    if (password.length < passwordLength) {
+      return InputValidation.create({
         failed: true,
         reason: I18n.t('user.password.too_short')
       });
     }
 
     if (this.get('rejectedPasswords').contains(password)) {
-      return Discourse.InputValidation.create({
+      return InputValidation.create({
         failed: true,
         reason: I18n.t('user.password.common')
       });
     }
 
     if (!Ember.isEmpty(this.get('accountUsername')) && this.get('accountPassword') === this.get('accountUsername')) {
-      return Discourse.InputValidation.create({
+      return InputValidation.create({
         failed: true,
         reason: I18n.t('user.password.same_as_username')
       });
     }
 
     if (!Ember.isEmpty(this.get('accountEmail')) && this.get('accountPassword') === this.get('accountEmail')) {
-      return Discourse.InputValidation.create({
+      return InputValidation.create({
         failed: true,
         reason: I18n.t('user.password.same_as_email')
       });
     }
 
     // Looks good!
-    return Discourse.InputValidation.create({
+    return InputValidation.create({
       ok: true,
       reason: I18n.t('user.password.ok')
     });
-  }.property('accountPassword', 'rejectedPasswords.@each', 'accountUsername', 'accountEmail'),
+  }.property('accountPassword', 'rejectedPasswords.[]', 'accountUsername', 'accountEmail', 'isDeveloper'),
 
   @on('init')
   fetchConfirmationValue() {
-    return Discourse.ajax('/users/hp.json').then(json => {
+    return ajax('/users/hp.json').then(json => {
       this.set('accountPasswordConfirm', json.value);
       this.set('accountChallenge', json.challenge.split("").reverse().join(""));
     });
@@ -360,6 +363,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
       this.set('formSubmitted', true);
       return Discourse.User.createAccount(attrs).then(function(result) {
+        self.set('isDeveloper', false);
         if (result.success) {
           // Trigger the browser's password manager using the hidden static login form:
           const $hidden_login_form = $('#hidden-login-form');
@@ -369,6 +373,9 @@ export default Ember.Controller.extend(ModalFunctionality, {
           $hidden_login_form.submit();
         } else {
           self.flash(result.message || I18n.t('create_account.failed'), 'error');
+          if (result.is_developer) {
+            self.set('isDeveloper', true);
+          }
           if (result.errors && result.errors.email && result.errors.email.length > 0 && result.values) {
             self.get('rejectedEmails').pushObject(result.values.email);
           }

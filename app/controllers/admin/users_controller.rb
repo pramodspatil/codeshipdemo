@@ -23,7 +23,8 @@ class Admin::UsersController < Admin::AdminController
                                     :primary_group,
                                     :generate_api_key,
                                     :revoke_api_key,
-                                    :anonymize]
+                                    :anonymize,
+                                    :reset_bounce_score]
 
   def index
     users = ::AdminUserIndexQuery.new(params).find_users
@@ -37,7 +38,7 @@ class Admin::UsersController < Admin::AdminController
   end
 
   def show
-    @user = User.find_by(username_lower: params[:id])
+    @user = User.find_by(id: params[:id])
     raise Discourse::NotFound unless @user
     render_serialized(@user, AdminDetailedUserSerializer, root: false)
   end
@@ -55,7 +56,7 @@ class Admin::UsersController < Admin::AdminController
     @user.save!
     @user.revoke_api_key
     StaffActionLogger.new(current_user).log_user_suspend(@user, params[:reason])
-    MessageBus.publish "/logout", @user.id, user_ids: [@user.id]
+    @user.logged_out
     render nothing: true
   end
 
@@ -72,7 +73,7 @@ class Admin::UsersController < Admin::AdminController
     if @user
       @user.auth_token = nil
       @user.save!
-      MessageBus.publish "/logout", @user.id, user_ids: [@user.id]
+      @user.logged_out
       render json: success_json
     else
       render json: {error: I18n.t('admin_js.admin.users.id_not_found')}, status: 404
@@ -87,6 +88,7 @@ class Admin::UsersController < Admin::AdminController
   def revoke_admin
     guardian.ensure_can_revoke_admin!(@user)
     @user.revoke_admin!
+    StaffActionLogger.new(current_user).log_revoke_admin(@user)
     render nothing: true
   end
 
@@ -103,18 +105,21 @@ class Admin::UsersController < Admin::AdminController
   def grant_admin
     guardian.ensure_can_grant_admin!(@user)
     @user.grant_admin!
+    StaffActionLogger.new(current_user).log_grant_admin(@user)
     render_serialized(@user, AdminUserSerializer)
   end
 
   def revoke_moderation
     guardian.ensure_can_revoke_moderation!(@user)
     @user.revoke_moderation!
+    StaffActionLogger.new(current_user).log_revoke_moderation(@user)
     render nothing: true
   end
 
   def grant_moderation
     guardian.ensure_can_grant_moderation!(@user)
     @user.grant_moderation!
+    StaffActionLogger.new(current_user).log_grant_moderation(@user)
     render_serialized(@user, AdminUserSerializer)
   end
 
@@ -216,7 +221,7 @@ class Admin::UsersController < Admin::AdminController
 
   def block
     guardian.ensure_can_block_user! @user
-    UserBlocker.block(@user, current_user)
+    UserBlocker.block(@user, current_user, keep_posts: true)
     render nothing: true
   end
 
@@ -278,9 +283,13 @@ class Admin::UsersController < Admin::AdminController
     return render nothing: true, status: 404 unless SiteSetting.enable_sso
 
     sso = DiscourseSingleSignOn.parse("sso=#{params[:sso]}&sig=#{params[:sig]}")
-    user = sso.lookup_or_create_user
 
-    render_serialized(user, AdminDetailedUserSerializer, root: false)
+    begin
+      user = sso.lookup_or_create_user
+      render_serialized(user, AdminDetailedUserSerializer, root: false)
+    rescue ActiveRecord::RecordInvalid => ex
+      render json: failed_json.merge(message: ex.message), status: 403
+    end
   end
 
   def delete_other_accounts_with_same_ip
@@ -328,7 +337,7 @@ class Admin::UsersController < Admin::AdminController
     email_token = user.email_tokens.create(email: user.email)
 
     unless params[:send_email] == '0' || params[:send_email] == 'false'
-      Jobs.enqueue( :user_email,
+      Jobs.enqueue( :critical_user_email,
                     type: :account_created,
                     user_id: user.id,
                     email_token: email_token.token)
@@ -345,6 +354,12 @@ class Admin::UsersController < Admin::AdminController
     else
       render json: failed_json.merge(user: AdminDetailedUserSerializer.new(user, root: false).as_json)
     end
+  end
+
+  def reset_bounce_score
+    guardian.ensure_can_reset_bounce_score!(@user)
+    @user.user_stat.update_columns(bounce_score: 0, reset_bounce_score_after: nil)
+    render json: success_json
   end
 
   private

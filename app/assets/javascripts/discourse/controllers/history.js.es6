@@ -3,15 +3,33 @@ import { categoryBadgeHTML } from 'discourse/helpers/category-link';
 import computed from 'ember-addons/ember-computed-decorators';
 import { propertyGreaterThan, propertyLessThan } from 'discourse/lib/computed';
 
+function customTagArray(fieldName) {
+  return function() {
+    var val = this.get(fieldName);
+    if (!val) { return val; }
+    if (!Array.isArray(val)) { val = [val]; }
+    return val;
+  }.property(fieldName);
+}
+
 // This controller handles displaying of history
 export default Ember.Controller.extend(ModalFunctionality, {
   loading: true,
   viewMode: "side_by_side",
-  revisionsTextKey: "post.revisions.controls.comparing_previous_to_current_out_of_total",
 
   _changeViewModeOnMobile: function() {
-    if (Discourse.Mobile.mobileView) { this.set("viewMode", "inline"); }
+    if (this.site.mobileView) { this.set("viewMode", "inline"); }
   }.on("init"),
+
+  previousTagChanges: customTagArray('model.tags_changes.previous'),
+  currentTagChanges: customTagArray('model.tags_changes.current'),
+
+  @computed('previousVersion', 'model.current_version', 'model.version_count')
+  revisionsText(previous, current, total) {
+    return I18n.t("post.revisions.controls.comparing_previous_to_current_out_of_total", {
+      previous, current, total
+    });
+  },
 
   refresh(postId, postVersion) {
     this.set("loading", true);
@@ -27,6 +45,25 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
   show(postId, postVersion) {
     Discourse.Post.showRevision(postId, postVersion).then(() => this.refresh(postId, postVersion));
+  },
+
+  revert(post, postVersion) {
+    post.revertToRevision(postVersion).then((result) => {
+      this.refresh(post.get('id'), postVersion);
+      if (result.topic) {
+        post.set('topic.slug', result.topic.slug);
+        post.set('topic.title', result.topic.title);
+        post.set('topic.fancy_title', result.topic.fancy_title);
+      }
+      if (result.category_id) {
+        post.set('topic.category', Discourse.Category.findById(result.category_id));
+      }
+      this.send("closeModal");
+    }).catch(function(e) {
+      if (e.jqXHR.responseJSON && e.jqXHR.responseJSON.errors && e.jqXHR.responseJSON.errors[0]) {
+        bootbox.alert(e.jqXHR.responseJSON.errors[0]);
+      }
+    });
   },
 
   @computed('model.created_at')
@@ -67,6 +104,11 @@ export default Ember.Controller.extend(ModalFunctionality, {
   @computed('model.previous_hidden')
   displayHide(prevHidden) {
     return !prevHidden && this.currentUser && this.currentUser.get('staff');
+  },
+
+  @computed()
+  displayRevert() {
+    return this.currentUser && this.currentUser.get('staff');
   },
 
   isEitherRevisionHidden: Ember.computed.or("model.previous_hidden", "model.current_hidden"),
@@ -141,6 +183,8 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
     hideVersion() { this.hide(this.get("model.post_id"), this.get("model.current_revision")); },
     showVersion() { this.show(this.get("model.post_id"), this.get("model.current_revision")); },
+
+    revertToVersion() { this.revert(this.get("post"), this.get("model.current_revision")); },
 
     displayInline()             { this.set("viewMode", "inline"); },
     displaySideBySide()         { this.set("viewMode", "side_by_side"); },

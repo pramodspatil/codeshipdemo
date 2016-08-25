@@ -1,9 +1,11 @@
 import { popupAjaxError } from 'discourse/lib/ajax-error';
 import { propertyEqual } from 'discourse/lib/computed';
+import { escapeExpression } from 'discourse/lib/utilities';
 
 export default Ember.Controller.extend({
   needs: ['adminGroupsType'],
   disableSave: false,
+  savingStatus: '',
 
   currentPage: function() {
     if (this.get("model.user_count") === 0) { return 0; }
@@ -33,6 +35,27 @@ export default Ember.Controller.extend({
       { name: 1, value: 1 }, { name: 2, value: 2 }, { name: 3, value: 3 }, { name: 4, value: 4 }
     ];
   }.property(),
+
+  demoAvatarUrl: function() {
+    return Discourse.getURL('/images/avatar.png');
+  }.property(),
+
+  flairPreviewStyle: function() {
+    var style = '';
+    if (this.get('model.flair_url')) {
+      style += 'background-image: url(' + escapeExpression(this.get('model.flair_url')) + '); ';
+    }
+    if (this.get('model.flairBackgroundHexColor')) {
+      style += 'background-color: #' + this.get('model.flairBackgroundHexColor') + ';';
+    }
+    return style;
+  }.property('model.flair_url', 'model.flairBackgroundHexColor'),
+
+  flairPreviewClasses: function() {
+    if (this.get('model.flairBackgroundHexColor')) {
+      return 'rounded';
+    }
+  }.property('model.flairBackgroundHexColor'),
 
   actions: {
     next() {
@@ -95,12 +118,15 @@ export default Ember.Controller.extend({
             groupType = groupsController.get("type");
 
       this.set('disableSave', true);
+      this.set('savingStatus', I18n.t('saving'));
 
       let promise = group.get("id") ? group.save() : group.create().then(() => groupsController.addObject(group));
 
-      promise.then(() => this.transitionToRoute("adminGroup", groupType, group.get('name')))
-             .catch(popupAjaxError)
-             .finally(() => this.set('disableSave', false));
+      promise.then(() => {
+        this.transitionToRoute("adminGroup", groupType, group.get('name'));
+        this.set('savingStatus', I18n.t('saved'));
+      }).catch(popupAjaxError)
+        .finally(() => this.set('disableSave', false));
     },
 
     destroy() {

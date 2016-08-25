@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe BadgeGranter do
 
@@ -72,10 +72,12 @@ describe BadgeGranter do
     end
 
     it 'should grant missing badges' do
+      good_topic = Badge.find(Badge::GoodTopic)
+
       post = Fabricate(:post, like_count: 30)
       2.times {
         BadgeGranter.backfill(Badge.find(Badge::NiceTopic), post_ids: [post.id])
-        BadgeGranter.backfill(Badge.find(Badge::GoodTopic))
+        BadgeGranter.backfill(good_topic)
       }
 
       # TODO add welcome
@@ -83,12 +85,36 @@ describe BadgeGranter do
 
       expect(post.user.notifications.count).to eq(2)
 
+      notification = post.user.notifications.last
+      data = notification.data_hash
+      expect(data["badge_id"]).to eq(good_topic.id)
+      expect(data["badge_slug"]).to eq(good_topic.slug)
+      expect(data["username"]).to eq(post.user.username)
+
       expect(Badge.find(Badge::NiceTopic).grant_count).to eq(1)
       expect(Badge.find(Badge::GoodTopic).grant_count).to eq(1)
     end
   end
 
   describe 'grant' do
+
+    it 'allows overriding of granted_at does not notify old bronze' do
+      badge = Fabricate(:badge, badge_type_id: BadgeType::Bronze)
+      time = 1.year.ago
+
+      user_badge = BadgeGranter.grant(badge, user, created_at: time)
+
+      expect(user_badge.granted_at).to eq(time)
+      expect(Notification.where(user_id: user.id).count).to eq(0)
+    end
+
+    it "doesn't grant disabled badges" do
+      badge = Fabricate(:badge, badge_type_id: BadgeType::Bronze, enabled: false)
+      time = 1.year.ago
+
+      user_badge = BadgeGranter.grant(badge, user, created_at: time)
+      expect(user_badge).to eq(nil)
+    end
 
     it 'grants multiple badges' do
       badge = Fabricate(:badge, multiple_grant: true)
@@ -188,7 +214,7 @@ describe BadgeGranter do
     end
 
     it "grants first edit" do
-      SiteSetting.ninja_edit_window = 0
+      SiteSetting.editing_grace_period = 0
       post = create_post
       user = post.user
 

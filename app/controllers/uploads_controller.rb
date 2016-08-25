@@ -9,9 +9,6 @@ class UploadsController < ApplicationController
     client_id = params[:client_id]
     synchronous = is_api? && params[:synchronous]
 
-    # HACK FOR IE9 to prevent the "download dialog"
-    response.headers["Content-Type"] = "text/plain" if request.user_agent =~ /MSIE 9/
-
     if type == "avatar"
       if SiteSetting.sso_overrides_avatar || !SiteSetting.allow_uploaded_avatars
         return render json: failed_json, status: 422
@@ -56,11 +53,13 @@ class UploadsController < ApplicationController
 
   def create_upload(type, file, url)
     begin
+      maximum_upload_size = [SiteSetting.max_image_size_kb, SiteSetting.max_attachment_size_kb].max.kilobytes
+
       # ensure we have a file
       if file.nil?
         # API can provide a URL
         if url.present? && is_api?
-          tempfile = FileHelper.download(url, 10.megabytes, "discourse-upload-#{type}") rescue nil
+          tempfile = FileHelper.download(url, maximum_upload_size, "discourse-upload-#{type}") rescue nil
           filename = File.basename(URI.parse(url).path)
         end
       else
@@ -71,17 +70,37 @@ class UploadsController < ApplicationController
 
       return { errors: I18n.t("upload.file_missing") } if tempfile.nil?
 
+      # convert pasted images to HQ jpegs
+      if filename == "blob.png" && SiteSetting.convert_pasted_images_to_hq_jpg
+        jpeg_path = "#{File.dirname(tempfile.path)}/blob.jpg"
+        `convert #{tempfile.path} -quality #{SiteSetting.convert_pasted_images_quality} #{jpeg_path}`
+        # only change the format of the image when JPG is at least 5% smaller
+        if File.size(jpeg_path) < File.size(tempfile.path) * 0.95
+          filename = "blob.jpg"
+          content_type = "image/jpeg"
+          tempfile = File.open(jpeg_path)
+        else
+          File.delete(jpeg_path) rescue nil
+        end
+      end
+
       # allow users to upload large images that will be automatically reduced to allowed size
-      if SiteSetting.max_image_size_kb > 0 && FileHelper.is_image?(filename) && File.size(tempfile.path) > 0
-        attempt = 2
-        allow_animation = type == "avatar" ? SiteSetting.allow_animated_avatars : SiteSetting.allow_animated_thumbnails
-        while attempt > 0 && File.size(tempfile.path) > SiteSetting.max_image_size_kb.kilobytes
-          image_info = FastImage.new(tempfile.path) rescue nil
-          w, h = *(image_info.try(:size) || [0, 0])
-          break if w == 0 || h == 0
-          dimensions = "#{(w * 0.8).floor}x#{(h * 0.8).floor}"
-          OptimizedImage.downsize(tempfile.path, tempfile.path, dimensions, filename: filename, allow_animation: allow_animation)
-          attempt -= 1
+      max_image_size_kb = SiteSetting.max_image_size_kb.kilobytes
+      if max_image_size_kb > 0 && FileHelper.is_image?(filename)
+        if File.size(tempfile.path) >= max_image_size_kb && Upload.should_optimize?(tempfile.path)
+          attempt = 2
+          allow_animation = type == "avatar" ? SiteSetting.allow_animated_avatars : SiteSetting.allow_animated_thumbnails
+          while attempt > 0
+            downsized_size = File.size(tempfile.path)
+            break if downsized_size < max_image_size_kb
+            image_info = FastImage.new(tempfile.path) rescue nil
+            w, h = *(image_info.try(:size) || [0, 0])
+            break if w == 0 || h == 0
+            downsize_ratio = best_downsize_ratio(downsized_size, max_image_size_kb)
+            dimensions = "#{(w * downsize_ratio).floor}x#{(h * downsize_ratio).floor}"
+            OptimizedImage.downsize(tempfile.path, tempfile.path, dimensions, filename: filename, allow_animation: allow_animation)
+            attempt -= 1
+          end
         end
       end
 
@@ -99,6 +118,16 @@ class UploadsController < ApplicationController
       upload.errors.empty? ? upload : { errors: upload.errors.values.flatten }
     ensure
       tempfile.try(:close!) rescue nil
+    end
+  end
+
+  def best_downsize_ratio(downsized_size, max_image_size)
+    if downsized_size / 9 > max_image_size
+      0.3
+    elsif downsized_size / 3 > max_image_size
+      0.6
+    else
+      0.8
     end
   end
 

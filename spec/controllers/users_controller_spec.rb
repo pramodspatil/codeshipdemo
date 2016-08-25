@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe UsersController do
 
@@ -104,26 +104,6 @@ describe UsersController do
     end
   end
 
-  describe '.authorize_email' do
-    it 'errors out for invalid tokens' do
-      get :authorize_email, token: 'asdfasdf'
-      expect(response).to be_success
-      expect(flash[:error]).to be_present
-    end
-
-    context 'valid token' do
-      it 'authorizes with a correct token' do
-        user = Fabricate(:user)
-        email_token = user.email_tokens.create(email: user.email)
-
-        get :authorize_email, token: email_token.token
-        expect(response).to be_success
-        expect(flash[:error]).to be_blank
-        expect(session[:current_user_id]).to be_present
-      end
-    end
-  end
-
   describe '.activate_account' do
     before do
       UsersController.any_instance.stubs(:honeypot_or_challenge_fails?).returns(false)
@@ -219,60 +199,6 @@ describe UsersController do
     end
   end
 
-  describe '.change_email' do
-    let(:new_email) { 'bubblegum@adventuretime.ooo' }
-
-    it "requires you to be logged in" do
-      expect { xhr :put, :change_email, username: 'asdf', email: new_email }.to raise_error(Discourse::NotLoggedIn)
-    end
-
-    context 'when logged in' do
-      let!(:user) { log_in }
-
-      it 'raises an error without an email parameter' do
-        expect { xhr :put, :change_email, username: user.username }.to raise_error(ActionController::ParameterMissing)
-      end
-
-      it "raises an error if you can't edit the user's email" do
-        Guardian.any_instance.expects(:can_edit_email?).with(user).returns(false)
-        xhr :put, :change_email, username: user.username, email: new_email
-        expect(response).to be_forbidden
-      end
-
-      context 'when the new email address is taken' do
-        let!(:other_user) { Fabricate(:coding_horror) }
-        it 'raises an error' do
-          expect { xhr :put, :change_email, username: user.username, email: other_user.email }.to raise_error(Discourse::InvalidParameters)
-        end
-
-        it 'raises an error if there is whitespace too' do
-          expect { xhr :put, :change_email, username: user.username, email: other_user.email + ' ' }.to raise_error(Discourse::InvalidParameters)
-        end
-      end
-
-      context 'when new email is different case of existing email' do
-        let!(:other_user) { Fabricate(:user, email: 'case.insensitive@gmail.com')}
-
-        it 'raises an error' do
-          expect { xhr :put, :change_email, username: user.username, email: other_user.email.upcase }.to raise_error(Discourse::InvalidParameters)
-        end
-      end
-
-      context 'success' do
-
-        it 'has an email token' do
-          expect { xhr :put, :change_email, username: user.username, email: new_email }.to change(EmailToken, :count)
-        end
-
-        it 'enqueues an email authorization' do
-          Jobs.expects(:enqueue).with(:user_email, has_entries(type: :authorize_email, user_id: user.id, to_address: new_email))
-          xhr :put, :change_email, username: user.username, email: new_email
-        end
-      end
-    end
-
-  end
-
   describe '.password_reset' do
     let(:user) { Fabricate(:user) }
 
@@ -318,13 +244,23 @@ describe UsersController do
         old_token = user.auth_token
 
         get :password_reset, token: token
-        put :password_reset, token: token, password: 'newpassword'
+        put :password_reset, token: token, password: 'hg9ow8yhg98o'
         expect(response).to be_success
         expect(assigns[:error]).to be_blank
 
         user.reload
         expect(user.auth_token).to_not eq old_token
         expect(user.auth_token.length).to eq 32
+      end
+
+      it "doesn't invalidate the token when loading the page" do
+        user = Fabricate(:user, auth_token: SecureRandom.hex(16))
+        email_token = user.email_tokens.create(email: user.email)
+
+        get :password_reset, token: email_token.token
+
+        email_token.reload
+        expect(email_token.confirmed).to eq(false)
       end
     end
 
@@ -347,17 +283,35 @@ describe UsersController do
       end
 
       it "logs in the user" do
-        put :password_reset, token: token, password: 'newpassword'
+        put :password_reset, token: token, password: 'ksjafh928r'
         expect(assigns(:user).errors).to be_blank
         expect(session[:current_user_id]).to be_present
       end
 
       it "doesn't log in the user when not approved" do
         SiteSetting.expects(:must_approve_users?).returns(true)
-        put :password_reset, token: token, password: 'newpassword'
+        put :password_reset, token: token, password: 'ksjafh928r'
         expect(assigns(:user).errors).to be_blank
         expect(session[:current_user_id]).to be_blank
       end
+    end
+  end
+
+  describe '.confirm_email_token' do
+    let(:user) { Fabricate(:user) }
+
+    it "token doesn't match any records" do
+      email_token = user.email_tokens.create(email: user.email)
+      get :confirm_email_token, token: SecureRandom.hex, format: :json
+      expect(response).to be_success
+      expect(email_token.reload.confirmed).to eq(false)
+    end
+
+    it "token matches" do
+      email_token = user.email_tokens.create(email: user.email)
+      get :confirm_email_token, token: email_token.token, format: :json
+      expect(response).to be_success
+      expect(email_token.reload.confirmed).to eq(true)
     end
   end
 
@@ -367,7 +321,7 @@ describe UsersController do
 
     context 'enqueues mail' do
       it 'enqueues mail with admin email and sso enabled' do
-        Jobs.expects(:enqueue).with(:user_email, has_entries(type: :admin_login, user_id: admin.id))
+        Jobs.expects(:enqueue).with(:critical_user_email, has_entries(type: :admin_login, user_id: admin.id))
         put :admin_login, email: admin.email
       end
     end
@@ -428,12 +382,24 @@ describe UsersController do
       @user.password = "strongpassword"
     end
 
-    def post_user
-      xhr :post, :create,
-        name: @user.name,
+    let(:post_user_params) do
+      { name: @user.name,
         username: @user.username,
         password: "strongpassword",
-        email: @user.email
+        email: @user.email }
+    end
+
+    def post_user
+      xhr :post, :create, post_user_params
+    end
+
+    context 'when creating a user' do
+      it 'sets the user locale to I18n.locale' do
+        SiteSetting.stubs(:default_locale).returns('en')
+        I18n.stubs(:locale).returns(:fr)
+        post_user
+        expect(User.find_by(username: @user.username).locale).to eq('fr')
+      end
     end
 
     context 'when creating a non active user (unconfirmed email)' do
@@ -454,7 +420,7 @@ describe UsersController do
       end
 
       it 'creates a user correctly' do
-        Jobs.expects(:enqueue).with(:user_email, has_entries(type: :signup))
+        Jobs.expects(:enqueue).with(:critical_user_email, has_entries(type: :signup))
         User.any_instance.expects(:enqueue_welcome_message).with('welcome_user').never
 
         post_user
@@ -486,6 +452,79 @@ describe UsersController do
         it "shows the 'waiting approval' message" do
           post_user
           expect(JSON.parse(response.body)['message']).to eq(I18n.t 'login.wait_approval')
+        end
+      end
+    end
+
+    context "creating as active" do
+      it "won't create the user as active" do
+        xhr :post, :create, post_user_params.merge(active: true)
+        expect(JSON.parse(response.body)['active']).to be_falsey
+      end
+
+      context "with a regular api key" do
+        let(:user) { Fabricate(:user) }
+        let(:api_key) { Fabricate(:api_key, user: user) }
+
+        it "won't create the user as active with a regular key" do
+          xhr :post, :create, post_user_params.merge(active: true, api_key: api_key.key)
+          expect(JSON.parse(response.body)['active']).to be_falsey
+        end
+      end
+
+      context "with an admin api key" do
+        let(:user) { Fabricate(:admin) }
+        let(:api_key) { Fabricate(:api_key, user: user) }
+
+        it "creates the user as active with a regular key" do
+          xhr :post, :create, post_user_params.merge(active: true, api_key: api_key.key)
+          expect(JSON.parse(response.body)['active']).to be_truthy
+        end
+
+        it "won't create the developer as active" do
+          UsernameCheckerService.expects(:is_developer?).returns(true)
+
+          xhr :post, :create, post_user_params.merge(active: true, api_key: api_key.key)
+          expect(JSON.parse(response.body)['active']).to be_falsy
+        end
+      end
+    end
+
+    context "creating as staged" do
+      it "won't create the user as staged" do
+        xhr :post, :create, post_user_params.merge(staged: true)
+        new_user = User.where(username: post_user_params[:username]).first
+        expect(new_user.staged?).to eq(false)
+      end
+
+      context "with a regular api key" do
+        let(:user) { Fabricate(:user) }
+        let(:api_key) { Fabricate(:api_key, user: user) }
+
+        it "won't create the user as staged with a regular key" do
+          xhr :post, :create, post_user_params.merge(staged: true, api_key: api_key.key)
+          new_user = User.where(username: post_user_params[:username]).first
+          expect(new_user.staged?).to eq(false)
+        end
+      end
+
+      context "with an admin api key" do
+        let(:user) { Fabricate(:admin) }
+        let(:api_key) { Fabricate(:api_key, user: user) }
+
+        it "creates the user as staged with a regular key" do
+          xhr :post, :create, post_user_params.merge(staged: true, api_key: api_key.key)
+
+          new_user = User.where(username: post_user_params[:username]).first
+          expect(new_user.staged?).to eq(true)
+        end
+
+        it "won't create the developer as staged" do
+          UsernameCheckerService.expects(:is_developer?).returns(true)
+          xhr :post, :create, post_user_params.merge(staged: true, api_key: api_key.key)
+
+          new_user = User.where(username: post_user_params[:username]).first
+          expect(new_user.staged?).to eq(false)
         end
       end
     end
@@ -680,7 +719,7 @@ describe UsersController do
       context "with values for the fields" do
         let(:create_params) { {
           name: @user.name,
-          password: 'watwatwat',
+          password: 'watwatwatwat',
           username: @user.username,
           email: @user.email,
           user_fields: {
@@ -730,7 +769,7 @@ describe UsersController do
       context "without values for the fields" do
         let(:create_params) { {
           name: @user.name,
-          password: 'watwatwat',
+          password: 'watwatwatwat',
           username: @user.username,
           email: @user.email,
         } }
@@ -750,7 +789,7 @@ describe UsersController do
       let!(:staged) { Fabricate(:staged, email: "staged@account.com") }
 
       it "succeeds" do
-        xhr :post, :create, email: staged.email, username: "zogstrip", password: "P4ssw0rd"
+        xhr :post, :create, email: staged.email, username: "zogstrip", password: "P4ssw0rd$$"
         result = ::JSON.parse(response.body)
         expect(result["success"]).to eq(true)
         expect(User.find_by(email: staged.email).staged).to eq(false)
@@ -1138,6 +1177,19 @@ describe UsersController do
 
         end
 
+        context 'a locale is chosen that differs from I18n.locale' do
+          it "updates the user's locale" do
+            I18n.stubs(:locale).returns('fr')
+
+            put :update,
+                username: user.username,
+                locale: :fa_IR
+
+            expect(User.find_by(username: user.username).locale).to eq('fa_IR')
+          end
+
+        end
+
         context "with user fields" do
           context "an editable field" do
             let!(:user_field) { Fabricate(:user_field) }
@@ -1186,9 +1238,7 @@ describe UsersController do
         it 'does not allow the update' do
           user = Fabricate(:user, name: 'Billy Bob')
           log_in_user(user)
-          guardian = Guardian.new(user)
-          guardian.stubs(:ensure_can_edit!).with(user).raises(Discourse::InvalidAccess.new)
-          Guardian.stubs(new: guardian).with(user)
+          Guardian.any_instance.expects(:can_edit?).with(user).returns(false)
 
           put :update, username: user.username, name: 'Jim Tom'
 
@@ -1323,7 +1373,7 @@ describe UsersController do
 
       context 'with a valid email_token' do
         it 'should send the activation email' do
-          Jobs.expects(:enqueue).with(:user_email, has_entries(type: :signup))
+          Jobs.expects(:enqueue).with(:critical_user_email, has_entries(type: :signup))
           xhr :post, :send_activation_email, username: user.username
         end
       end
@@ -1341,7 +1391,7 @@ describe UsersController do
         end
 
         it 'should send an email' do
-          Jobs.expects(:enqueue).with(:user_email, has_entries(type: :signup))
+          Jobs.expects(:enqueue).with(:critical_user_email, has_entries(type: :signup))
           xhr :post, :send_activation_email, username: user.username
         end
       end
@@ -1537,6 +1587,82 @@ describe UsersController do
 
     end
 
+  end
+
+  describe ".is_local_username" do
+
+    let(:user) { Fabricate(:user) }
+    let(:group) { Fabricate(:group, name: "Discourse") }
+
+    it "finds the user" do
+      xhr :get, :is_local_username, username: user.username
+      expect(response).to be_success
+      json = JSON.parse(response.body)
+      expect(json["valid"][0]).to eq(user.username)
+    end
+
+    it "finds the group" do
+      xhr :get, :is_local_username, username: group.name
+      expect(response).to be_success
+      json = JSON.parse(response.body)
+      expect(json["valid_groups"][0]).to eq(group.name)
+    end
+
+    it "supports multiples usernames" do
+      xhr :get, :is_local_username, usernames: [user.username, "system"]
+      expect(response).to be_success
+      json = JSON.parse(response.body)
+      expect(json["valid"].size).to eq(2)
+    end
+
+    it "never includes staged accounts" do
+      staged = Fabricate(:user, staged: true)
+      xhr :get, :is_local_username, usernames: [staged.username]
+      expect(response).to be_success
+      json = JSON.parse(response.body)
+      expect(json["valid"].size).to eq(0)
+    end
+
+  end
+
+  describe '.topic_tracking_state' do
+    let(:user){Fabricate(:user)}
+
+    context 'anon' do
+      it "raises an error on anon for topic_tracking_state" do
+        expect{
+          xhr :get, :topic_tracking_state, username: user.username, format: :json
+        }.to raise_error(Discourse::NotLoggedIn)
+      end
+    end
+
+    context 'logged on' do
+      it "detects new topic" do
+        log_in_user(user)
+
+        topic = Fabricate(:topic)
+        xhr :get, :topic_tracking_state, username: user.username, format: :json
+
+        states = JSON.parse(response.body)
+
+        expect(states[0]["topic_id"]).to eq(topic.id)
+      end
+    end
+  end
+
+  describe '.summary' do
+
+    it "generates summary info" do
+      user = Fabricate(:user)
+      create_post(user: user)
+
+      xhr :get, :summary, username: user.username_lower
+      expect(response).to be_success
+      json = JSON.parse(response.body)
+
+      expect(json["user_summary"]["topic_count"]).to eq(1)
+      expect(json["user_summary"]["post_count"]).to eq(1)
+    end
   end
 
 end

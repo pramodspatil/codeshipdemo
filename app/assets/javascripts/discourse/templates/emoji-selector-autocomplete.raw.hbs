@@ -1,10 +1,11 @@
 <div class='autocomplete'>
   <ul>
-    {{#each option in options}}
+    {{#each options as |option|}}
       <li>
         <a href>
           {{#if option.src}}
-            <img src={{option.src}} class='emoji'> {{option.code}}
+            <img src={{option.src}} class='emoji'>
+            <span class='emoji-shortname'>{{option.code}}</span>
           {{else}}
             {{option.label}}
           {{/if}}

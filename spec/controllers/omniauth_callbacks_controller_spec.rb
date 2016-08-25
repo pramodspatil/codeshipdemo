@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe Users::OmniauthCallbacksController do
 
@@ -7,13 +7,13 @@ describe Users::OmniauthCallbacksController do
       SiteSetting.stubs("enable_twitter_logins?").returns(false)
       expect(lambda {
         Users::OmniauthCallbacksController.find_authenticator("twitter")
-      }).to raise_error
+      }).to raise_error(Discourse::InvalidAccess)
     end
 
     it "fails for unknown" do
       expect(lambda {
         Users::OmniauthCallbacksController.find_authenticator("twitter1")
-      }).to raise_error
+      }).to raise_error(Discourse::InvalidAccess)
     end
 
     it "finds an authenticator when enabled" do

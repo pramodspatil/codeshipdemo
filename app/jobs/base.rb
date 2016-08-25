@@ -148,7 +148,7 @@ module Jobs
           t = Thread.new do
             begin
               RailsMultisite::ConnectionManagement.establish_connection(db: db)
-              I18n.locale = SiteSetting.default_locale
+              I18n.locale = SiteSetting.default_locale || "en"
               I18n.ensure_all_loaded!
               begin
                 execute(opts)
@@ -173,10 +173,9 @@ module Jobs
 
       if exceptions.length > 0
         exceptions.each do |exception_hash|
-          Discourse.handle_job_exception(exception_hash[:ex],
-                error_context(opts, exception_hash[:code], exception_hash[:other]))
+          Discourse.handle_job_exception(exception_hash[:ex], error_context(opts, exception_hash[:code], exception_hash[:other]))
         end
-        raise HandledExceptionWrapper.new exceptions[0][:ex]
+        raise HandledExceptionWrapper.new(exceptions[0][:ex])
       end
 
       nil
@@ -197,6 +196,11 @@ module Jobs
 
   class Scheduled < Base
     extend Scheduler::Schedule
+
+    def perform(*args)
+      return if Discourse.readonly_mode?
+      super
+    end
   end
 
   def self.enqueue(job_name, opts={})
@@ -210,7 +214,7 @@ module Jobs
     # If we are able to queue a job, do it
     if SiteSetting.queue_jobs?
       if opts[:delay_for].present?
-        klass.delay_for(opts.delete(:delay_for)).delayed_perform(opts)
+        klass.perform_in(opts.delete(:delay_for), opts)
       else
         Sidekiq::Client.enqueue(klass, opts)
       end
@@ -232,31 +236,28 @@ module Jobs
     enqueue_in(secs, job_name, opts)
   end
 
-  def self.cancel_scheduled_job(job_name, params={})
-    jobs = scheduled_for(job_name, params)
-    return false if jobs.empty?
-    jobs.each { |job| job.delete }
-    true
+  def self.cancel_scheduled_job(job_name, opts={})
+    scheduled_for(job_name, opts).each(&:delete)
   end
 
-  def self.scheduled_for(job_name, params={})
+  def self.scheduled_for(job_name, opts={})
+    opts = opts.with_indifferent_access
+    unless opts.delete(:all_sites)
+      opts[:current_site_id] ||= RailsMultisite::ConnectionManagement.current_db
+    end
+
     job_class = "Jobs::#{job_name.to_s.camelcase}"
     Sidekiq::ScheduledSet.new.select do |scheduled_job|
-      if scheduled_job.klass == 'Sidekiq::Extensions::DelayedClass'
-        job_args = YAML.load(scheduled_job.args[0])
-        job_args_class, _, (job_args_params, *) = job_args
-        if job_args_class.to_s == job_class && job_args_params
-          matched = true
-          params.each do |key, value|
-            unless job_args_params[key] == value
-              matched = false
-              break
-            end
+      if scheduled_job.klass.to_s == job_class
+        matched = true
+        job_params = scheduled_job.item["args"][0].with_indifferent_access
+        opts.each do |key, value|
+          if job_params[key] != value
+            matched = false
+            break
           end
-          matched
-        else
-          false
         end
+        matched
       else
         false
       end
@@ -264,6 +265,6 @@ module Jobs
   end
 end
 
-# Require all jobs
+Dir["#{Rails.root}/app/jobs/onceoff/*.rb"].each {|file| require_dependency file }
 Dir["#{Rails.root}/app/jobs/regular/*.rb"].each {|file| require_dependency file }
 Dir["#{Rails.root}/app/jobs/scheduled/*.rb"].each {|file| require_dependency file }

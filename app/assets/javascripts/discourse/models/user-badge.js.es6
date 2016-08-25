@@ -1,3 +1,4 @@
+import { ajax } from 'discourse/lib/ajax';
 import Badge from 'discourse/models/badge';
 
 const UserBadge = Discourse.Model.extend({
@@ -6,14 +7,9 @@ const UserBadge = Discourse.Model.extend({
       return "/t/-/" + this.get('topic_id') + "/" + this.get('post_number');
     }
   }.property(), // avoid the extra bindings for now
-  /**
-    Revoke this badge.
 
-    @method revoke
-    @returns {Promise} a promise that resolves when the badge has been revoked.
-  **/
-  revoke: function() {
-    return Discourse.ajax("/user_badges/" + this.get('id'), {
+  revoke() {
+    return ajax("/user_badges/" + this.get('id'), {
       type: "DELETE"
     });
   }
@@ -48,11 +44,11 @@ UserBadge.reopenClass({
     if ("user_badge" in json) {
       userBadges = [json.user_badge];
     } else {
-      userBadges = json.user_badges;
+      userBadges = (json.user_badge_info && json.user_badge_info.user_badges) || json.user_badges;
     }
 
     userBadges = userBadges.map(function(userBadgeJson) {
-      var userBadge = Discourse.UserBadge.create(userBadgeJson);
+      var userBadge = UserBadge.create(userBadgeJson);
 
       var grantedAtDate = Date.parse(userBadge.get('granted_at'));
       userBadge.set('grantedAt', grantedAtDate);
@@ -73,6 +69,10 @@ UserBadge.reopenClass({
     if ("user_badge" in json) {
       return userBadges[0];
     } else {
+      if (json.user_badge_info) {
+        userBadges.grant_count = json.user_badge_info.grant_count;
+        userBadges.username = json.user_badge_info.username;
+      }
       return userBadges;
     }
   },
@@ -83,15 +83,15 @@ UserBadge.reopenClass({
     @method findByUsername
     @param {String} username
     @param {Object} options
-    @returns {Promise} a promise that resolves to an array of `Discourse.UserBadge`.
+    @returns {Promise} a promise that resolves to an array of `UserBadge`.
   **/
   findByUsername: function(username, options) {
     var url = "/user-badges/" + username + ".json";
     if (options && options.grouped) {
       url += "?grouped=true";
     }
-    return Discourse.ajax(url).then(function(json) {
-      return Discourse.UserBadge.createFromJson(json);
+    return ajax(url).then(function(json) {
+      return UserBadge.createFromJson(json);
     });
   },
 
@@ -100,16 +100,16 @@ UserBadge.reopenClass({
 
     @method findById
     @param {String} badgeId
-    @returns {Promise} a promise that resolves to an array of `Discourse.UserBadge`.
+    @returns {Promise} a promise that resolves to an array of `UserBadge`.
   **/
   findByBadgeId: function(badgeId, options) {
     if (!options) { options = {}; }
     options.badge_id = badgeId;
 
-    return Discourse.ajax("/user_badges.json", {
+    return ajax("/user_badges.json", {
       data: options
     }).then(function(json) {
-      return Discourse.UserBadge.createFromJson(json);
+      return UserBadge.createFromJson(json);
     });
   },
 
@@ -119,10 +119,10 @@ UserBadge.reopenClass({
     @method grant
     @param {Integer} badgeId id of the badge to be granted.
     @param {String} username username of the user to be granted the badge.
-    @returns {Promise} a promise that resolves to an instance of `Discourse.UserBadge`.
+    @returns {Promise} a promise that resolves to an instance of `UserBadge`.
   **/
   grant: function(badgeId, username, reason) {
-    return Discourse.ajax("/user_badges", {
+    return ajax("/user_badges", {
       type: "POST",
       data: {
         username: username,
@@ -130,7 +130,7 @@ UserBadge.reopenClass({
         reason: reason
       }
     }).then(function(json) {
-      return Discourse.UserBadge.createFromJson(json);
+      return UserBadge.createFromJson(json);
     });
   }
 });

@@ -7,3 +7,11 @@ test("Pending", () => {
   visit("/users/eviltrout/activity/pending");
   hasStream();
 });
+
+test("Root URL - Viewing Self", () => {
+  visit("/users/eviltrout");
+  andThen(() => {
+    equal(currentPath(), 'user.summary', "it defaults to summary");
+  });
+});
+

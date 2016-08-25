@@ -72,12 +72,36 @@ class PostRevisor
     tc.check_result(tc.topic.change_category_to_id(category_id))
   end
 
+  track_topic_field(:tags) do |tc, tags|
+    if tc.guardian.can_tag_topics?
+      prev_tags = tc.topic.tags.map(&:name)
+      next if tags.blank? && prev_tags.blank?
+      if !DiscourseTagging.tag_topic_by_names(tc.topic, tc.guardian, tags)
+        tc.check_result(false)
+        next
+      end
+      tc.record_change('tags', prev_tags, tags) unless prev_tags.sort == tags.sort
+    end
+  end
+
+  track_topic_field(:tags_empty_array) do |tc, val|
+    if val.present? && tc.guardian.can_tag_topics?
+      prev_tags = tc.topic.tags.map(&:name)
+      if !DiscourseTagging.tag_topic_by_names(tc.topic, tc.guardian, [])
+        tc.check_result(false)
+        next
+      end
+      tc.record_change('tags', prev_tags, nil)
+    end
+  end
+
   # AVAILABLE OPTIONS:
   # - revised_at: changes the date of the revision
   # - force_new_version: bypass ninja-edit window
   # - bypass_rate_limiter:
   # - bypass_bump: do not bump the topic, even if last post
   # - skip_validations: ask ActiveRecord to skip validations
+  # - skip_revision: do not create a new PostRevision record
   def revise!(editor, fields, opts={})
     @editor = editor
     @fields = fields.with_indifferent_access
@@ -111,9 +135,13 @@ class PostRevisor
     @validate_topic = @opts[:validate_topic] if @opts.has_key?(:validate_topic)
     @validate_topic = !@opts[:validate_topic] if @opts.has_key?(:skip_validations)
 
+    @skip_revision = false
+    @skip_revision = @opts[:skip_revision] if @opts.has_key?(:skip_revision)
+
     Post.transaction do
       revise_post
 
+      yield if block_given?
       # TODO: these callbacks are being called in a transaction
       # it is kind of odd, because the callback is called "before_edit"
       # but the post is already edited at this point
@@ -154,6 +182,7 @@ class PostRevisor
     POST_TRACKED_FIELDS.each do |field|
       return true if @fields.has_key?(field) && @fields[field] != @post.send(field)
     end
+    advance_draft_sequence
     false
   end
 
@@ -166,6 +195,7 @@ class PostRevisor
   end
 
   def should_create_new_version?
+    return false if @skip_revision
     edited_by_another_user? || !ninja_edit? || owner_changed? || force_new_version?
   end
 
@@ -174,7 +204,8 @@ class PostRevisor
   end
 
   def ninja_edit?
-    @revised_at - @last_version_at <= SiteSetting.ninja_edit_window.to_i
+    return false if @post.has_active_flag?
+    @revised_at - @last_version_at <= SiteSetting.editing_grace_period.to_i
   end
 
   def owner_changed?
@@ -229,10 +260,10 @@ class PostRevisor
     end
 
     @post.last_editor_id = @editor.id
-    @post.word_count     = @fields[:raw].scan(/\w+/).size if @fields.has_key?(:raw)
+    @post.word_count     = @fields[:raw].scan(/[[:word:]]+/).size if @fields.has_key?(:raw)
     @post.self_edits    += 1 if self_edit?
 
-    clear_flags_and_unhide_post
+    remove_flags_and_unhide_post
 
     @post.extract_quoted_post_numbers
 
@@ -269,9 +300,11 @@ class PostRevisor
     @editor == @post.user
   end
 
-  def clear_flags_and_unhide_post
+  def remove_flags_and_unhide_post
     return unless editing_a_flagged_and_hidden_post?
-    PostAction.clear_flags!(@post, Discourse.system_user)
+    @post.post_actions.where(post_action_type_id: PostActionType.flag_types.values).each do |action|
+      action.remove_act!(Discourse.system_user)
+    end
     @post.unhide!
   end
 
@@ -296,6 +329,7 @@ class PostRevisor
   end
 
   def create_or_update_revision
+    return if @skip_revision
     # don't create an empty revision if something failed
     return unless successfully_saved_post_and_topic
     @version_changed ? create_revision : update_revision
@@ -359,7 +393,7 @@ class PostRevisor
   end
 
   def bypass_bump?
-    !@post_successfully_saved || @opts[:bypass_bump] == true
+    !@post_successfully_saved || @topic_changes.errored? || @opts[:bypass_bump] == true
   end
 
   def is_last_post?
@@ -429,7 +463,14 @@ class PostRevisor
   end
 
   def publish_changes
-    @post.publish_change_to_clients!(:revised)
+    options =
+      if !@topic_changes.diff.empty? && !@topic_changes.errored?
+        { reload_topic: true }
+      else
+        {}
+      end
+
+    @post.publish_change_to_clients!(:revised, options)
   end
 
   def grant_badge

@@ -1,13 +1,16 @@
-import { onToolbarCreate } from 'discourse/components/d-editor';
+import { withPluginApi } from 'discourse/lib/plugin-api';
+import { registerEmoji } from 'pretty-text/emoji';
+import PreloadStore from 'preload-store';
 
 export default {
   name: 'enable-emoji',
 
   initialize(container) {
     const siteSettings = container.lookup('site-settings:main');
+    if (!siteSettings.enable_emoji) { return; }
 
-    if (siteSettings.enable_emoji) {
-      onToolbarCreate(toolbar => {
+    withPluginApi('0.1', api => {
+      api.onToolbarCreate(toolbar => {
         toolbar.addButton({
           id: 'emoji',
           group: 'extras',
@@ -16,9 +19,8 @@ export default {
           title: 'composer.emoji'
         });
       });
+    });
 
-      // enable plugin emojis
-      Discourse.Emoji.applyCustomEmojis();
-    }
+    (PreloadStore.get("customEmoji") || []).forEach(emoji => registerEmoji(emoji.name, emoji.url));
   }
 };

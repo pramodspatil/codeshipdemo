@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe Admin::GroupsController do
 
@@ -30,7 +30,14 @@ describe Admin::GroupsController do
         "automatic_membership_retroactive"=>false,
         "title"=>nil,
         "primary_group"=>false,
-        "grant_trust_level"=>nil
+        "grant_trust_level"=>nil,
+        "incoming_email"=>nil,
+        "notification_level"=>2,
+        "has_messages"=>false,
+        "is_member"=>true,
+        "mentionable"=>false,
+        "flair_url"=>nil,
+        "flair_bg_color"=>nil
       }])
     end
 

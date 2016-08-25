@@ -21,12 +21,29 @@
 }
 
 .composer-popup {
+  position: absolute;
+  width: calc(50% - 55px);
+  max-width: 724px;
+  top: 16px;
+  bottom: 16px;
+  left: 50%;
+  // The composer goes off-center at 1550px
+  @media (min-width: 1550px) {
+    left: calc(50% - 15px);
+  }
+  overflow-y: auto;
+  z-index: 110;
+  padding: 10px;
 
   box-shadow: 3px 3px 3px rgba(0,0,0, 0.34);
   background: dark-light-diff($highlight, $secondary, 50%, -80%);
 
   &.urgent {
     background: dark-light-diff($danger, $secondary, 50%, -40%);
+  }
+
+  &.education-message {
+    background-color: dark-light-diff($tertiary, $secondary, 85%, -65%);
   }
 
   h3 {
@@ -48,9 +65,6 @@
     opacity: 1.0;
   }
 
-  padding: 10px;
-  width: 600px;
-  position: absolute;
 
   ul.topics {
     list-style: none;
@@ -61,6 +75,13 @@
       font-weight: normal;
       margin-top: 8px;
     }
+  }
+}
+
+.custom-body {
+  background-color: dark-light-diff($tertiary, $secondary, 85%, -65%);
+  p {
+    max-width: 98%;
   }
 }
 
@@ -82,7 +103,7 @@
   }
   .search-link {
     .fa, .blurb {
-      color: dark-light-choose(scale-color($tertiary, $lightness: -40%), scale-color($tertiary, $lightness: 40%));
+      color: dark-light-choose(scale-color($primary, $lightness: 45%), scale-color($secondary, $lightness: 55%));
     }
   }
   .badge-wrapper {
@@ -92,10 +113,8 @@
 
 .composer-popup:nth-of-type(2) {
   margin-left: 10px;
+  width: calc(50% - 65px);
 }
-
-// hide cancel upload link on IE9 (not supported)
-.ie9 #cancel-file-upload { display: none; }
 
 // only disabled when the device is touch-only
 .touch.mobile-device #reply-control.open .grippie {
@@ -130,7 +149,7 @@
     right: 1px;
     position: absolute;
     font-size: 1.071em;
-    color: $primary;
+    color: dark-light-choose(scale-color($primary, $lightness: 50%), scale-color($secondary, $lightness: 50%));
     padding: 0 10px 5px 10px;
     &:before {
       font-family: "FontAwesome";
@@ -265,9 +284,10 @@
       margin-left: 10px;
       top: 18px;
       #edit-reason {
-        margin: 0;
+        margin: -7px 0 0;
         padding: 5px;
         float: left;
+        width: 300px;
       }
     }
     #reply-title {
@@ -353,6 +373,9 @@
 #reply-control {
   .wmd-controls.hide-preview {
     .d-editor-input {
+      width: 100%;
+    }
+    .d-editor-button-bar {
       width: 100%;
     }
     .d-editor-preview-wrapper {

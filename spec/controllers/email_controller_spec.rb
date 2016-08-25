@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe EmailController do
 
@@ -19,94 +19,219 @@ describe EmailController do
 
   end
 
-  context '.resubscribe' do
-
-    let(:user) { Fabricate(:user, email_digests: false) }
-    let(:key) { DigestUnsubscribeKey.create_key_for(user) }
-
-    context 'with a valid key' do
-      before do
-        get :resubscribe, key: key
-        user.reload
-      end
-
-      it 'subscribes the user' do
-        expect(user.email_digests).to eq(true)
-      end
+  context '.perform unsubscribe' do
+    it 'raises not found on invalid key' do
+      post :perform_unsubscribe, key: "123"
+      expect(response.status).to eq(404)
     end
 
+    it 'can fully unsubscribe' do
+      user = Fabricate(:user)
+      key = UnsubscribeKey.create_key_for(user, "all")
+
+      user.user_option.update_columns(email_always: true,
+                                     email_digests: true,
+                                     email_direct: true,
+                                     email_private_messages: true)
+
+      post :perform_unsubscribe, key: key, unsubscribe_all: "1"
+      expect(response.status).to eq(302)
+
+      user.user_option.reload
+
+      expect(user.user_option.email_always).to eq(false)
+      expect(user.user_option.email_digests).to eq(false)
+      expect(user.user_option.email_direct).to eq(false)
+      expect(user.user_option.email_private_messages).to eq(false)
+
+    end
+
+    it 'can disable mailing list' do
+      user = Fabricate(:user)
+      key = UnsubscribeKey.create_key_for(user, "all")
+
+      user.user_option.update_columns(mailing_list_mode: true)
+
+      post :perform_unsubscribe, key: key, disable_mailing_list: "1"
+      expect(response.status).to eq(302)
+
+      user.user_option.reload
+
+      expect(user.user_option.mailing_list_mode).to eq(false)
+    end
+
+    it 'can disable digest' do
+      user = Fabricate(:user)
+      key = UnsubscribeKey.create_key_for(user, "all")
+
+      user.user_option.update_columns(email_digests: true)
+
+      post :perform_unsubscribe, key: key, disable_digest_emails: "1"
+      expect(response.status).to eq(302)
+
+      user.user_option.reload
+
+      expect(user.user_option.email_digests).to eq(false)
+    end
+
+    it 'can unwatch topic' do
+      p = Fabricate(:post)
+      key = UnsubscribeKey.create_key_for(p.user, p)
+
+      TopicUser.change(p.user_id, p.topic_id, notification_level: TopicUser.notification_levels[:watching])
+      post :perform_unsubscribe, key: key, unwatch_topic: "1"
+      expect(response.status).to eq(302)
+
+      expect(TopicUser.get(p.topic, p.user).notification_level).to eq(TopicUser.notification_levels[:tracking])
+    end
+
+    it 'can mute topic' do
+      p = Fabricate(:post)
+      key = UnsubscribeKey.create_key_for(p.user, p)
+
+      TopicUser.change(p.user_id, p.topic_id, notification_level: TopicUser.notification_levels[:watching])
+      post :perform_unsubscribe, key: key, mute_topic: "1"
+      expect(response.status).to eq(302)
+
+      expect(TopicUser.get(p.topic, p.user).notification_level).to eq(TopicUser.notification_levels[:muted])
+    end
+
+    it 'can unwatch category' do
+      p = Fabricate(:post)
+      key = UnsubscribeKey.create_key_for(p.user, p)
+
+      cu = CategoryUser.create!(user_id: p.user.id,
+                          category_id: p.topic.category_id,
+                          notification_level: CategoryUser.notification_levels[:watching])
+
+      post :perform_unsubscribe, key: key, unwatch_category: "1"
+      expect(response.status).to eq(302)
+
+      expect(CategoryUser.find_by(id: cu.id)).to eq(nil)
+    end
+
+    it 'can unwatch first post from category' do
+      p = Fabricate(:post)
+      key = UnsubscribeKey.create_key_for(p.user, p)
+
+      cu = CategoryUser.create!(user_id: p.user.id,
+                          category_id: p.topic.category_id,
+                          notification_level: CategoryUser.notification_levels[:watching_first_post])
+
+      post :perform_unsubscribe, key: key, unwatch_category: "1"
+      expect(response.status).to eq(302)
+
+      expect(CategoryUser.find_by(id: cu.id)).to eq(nil)
+    end
   end
 
   context '.unsubscribe' do
 
-    let(:user) { Fabricate(:user) }
-    let(:key) { DigestUnsubscribeKey.create_key_for(user) }
+    render_views
 
-    context 'with a valid key' do
-      before do
-        get :unsubscribe, key: key
-        user.reload
-      end
+    it 'displays logo ut button if wrong user logged in' do
+      log_in_user Fabricate(:admin)
+      user = Fabricate(:user)
+      key = UnsubscribeKey.create_key_for(user, "digest")
 
-      it 'unsubscribes the user' do
-        expect(user.email_digests).to eq(false)
-      end
+      get :unsubscribe, key: key
 
-      it "sets the appropriate instance variables" do
-        expect(assigns(:success)).to be_present
-      end
+      expect(response.body).to include(I18n.t("unsubscribe.log_out"))
+      expect(response.body).to include(I18n.t("unsubscribe.different_user_description"))
     end
 
-    context "with an expired key or invalid key" do
-      before do
-        get :unsubscribe, key: 'watwatwat'
-      end
-
-      it "sets the appropriate instance variables" do
-        expect(assigns(:success)).to be_blank
-      end
+    it 'displays not found if key is not found' do
+      get :unsubscribe, key: SecureRandom.hex
+      expect(response.body).to include(CGI.escapeHTML(I18n.t("unsubscribe.not_found_description")))
     end
 
-    context 'when logged in as a different user' do
-      let!(:logged_in_user) { log_in(:coding_horror) }
+    it 'correctly handles mailing list mode' do
 
-      before do
-        get :unsubscribe, key: key
-        user.reload
-      end
+      user = Fabricate(:user)
+      key = UnsubscribeKey.create_key_for(user, "digest")
 
-      it 'does not unsubscribe the user' do
-        expect(user.email_digests).to eq(true)
-      end
+      user.user_option.update_columns(mailing_list_mode: true)
 
-      it 'sets the appropriate instance variables' do
-        expect(assigns(:success)).to be_blank
-        expect(assigns(:different_user)).to be_present
-      end
+      get :unsubscribe, key: key
+      expect(response.body).to include(I18n.t("unsubscribe.mailing_list_mode"))
+
+      SiteSetting.disable_mailing_list_mode = true
+
+      get :unsubscribe, key: key
+      expect(response.body).not_to include(I18n.t("unsubscribe.mailing_list_mode"))
+
+      user.user_option.update_columns(mailing_list_mode: false)
+      SiteSetting.disable_mailing_list_mode = false
+
+      get :unsubscribe, key: key
+      expect(response.body).not_to include(I18n.t("unsubscribe.mailing_list_mode"))
+
     end
 
-    context 'when logged in as the keyed user' do
+    it 'correctly handles digest unsubscribe' do
 
-      before do
-        log_in_user(user)
-        get :unsubscribe, key: DigestUnsubscribeKey.create_key_for(user)
-        user.reload
-      end
+      user = Fabricate(:user)
+      user.user_option.update_columns(email_digests: false)
+      key = UnsubscribeKey.create_key_for(user, "digest")
 
-      it 'unsubscribes the user' do
-        expect(user.email_digests).to eq(false)
-      end
+      # because we are type digest we will always show digest and it will be selected
+      get :unsubscribe, key: key
+      expect(response.body).to include(I18n.t("unsubscribe.disable_digest_emails"))
 
-      it 'sets the appropriate instance variables' do
-        expect(assigns(:success)).to be_present
-      end
+      source = Nokogiri::HTML::fragment(response.body)
+      expect(source.css("#disable_digest_emails")[0]["checked"]).to eq("checked")
+
+      SiteSetting.disable_digest_emails = true
+
+      get :unsubscribe, key: key
+      expect(response.body).not_to include(I18n.t("unsubscribe.disable_digest_emails"))
+
+      SiteSetting.disable_digest_emails = false
+      key = UnsubscribeKey.create_key_for(user, "not_digest")
+
+      get :unsubscribe, key: key
+      expect(response.body).to include(I18n.t("unsubscribe.disable_digest_emails"))
     end
 
-    it "sets not_found when the key didn't match anything" do
-      get :unsubscribe, key: 'asdfasdf'
-      expect(assigns(:not_found)).to eq(true)
+    it 'correctly handles watched categories' do
+      post = Fabricate(:post)
+      user = post.user
+      cu = CategoryUser.create!(user_id: user.id,
+                          category_id: post.topic.category_id,
+                          notification_level: CategoryUser.notification_levels[:watching])
+
+
+      key = UnsubscribeKey.create_key_for(user, post)
+      get :unsubscribe, key: key
+      expect(response.body).to include("unwatch_category")
+
+      cu.destroy!
+
+      get :unsubscribe, key: key
+      expect(response.body).not_to include("unwatch_category")
+
     end
 
+    it 'correctly handles watched first post categories' do
+      post = Fabricate(:post)
+      user = post.user
+      cu = CategoryUser.create!(user_id: user.id,
+                          category_id: post.topic.category_id,
+                          notification_level: CategoryUser.notification_levels[:watching_first_post])
+
+
+      key = UnsubscribeKey.create_key_for(user, post)
+      get :unsubscribe, key: key
+      expect(response.body).to include("unwatch_category")
+
+      cu.destroy!
+
+      get :unsubscribe, key: key
+      expect(response.body).not_to include("unwatch_category")
+
+    end
   end
+
+
 
 end

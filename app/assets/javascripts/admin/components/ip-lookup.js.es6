@@ -1,3 +1,5 @@
+import { ajax } from 'discourse/lib/ajax';
+
 export default Ember.Component.extend({
   classNames: ["ip-lookup"],
 
@@ -22,7 +24,7 @@ export default Ember.Component.extend({
       this.set("show", true);
 
       if (!this.get("location")) {
-        Discourse.ajax("/admin/users/ip-info", {
+        ajax("/admin/users/ip-info", {
           data: { ip: this.get("ip") }
         }).then(function (location) {
           self.set("location", Em.Object.create(location));
@@ -38,11 +40,12 @@ export default Ember.Component.extend({
           "order": "trust_level DESC"
         };
 
-        Discourse.ajax("/admin/users/total-others-with-same-ip", { data }).then(function (result) {
+        ajax("/admin/users/total-others-with-same-ip", { data }).then(function (result) {
           self.set("totalOthersWithSameIP", result.total);
         });
 
-        Discourse.AdminUser.findAll("active", data).then(function (users) {
+        const AdminUser = require('admin/models/admin-user').default;
+        AdminUser.findAll("active", data).then(function (users) {
           self.setProperties({
             other_accounts: users,
             otherAccountsLoading: false,
@@ -65,7 +68,7 @@ export default Ember.Component.extend({
             totalOthersWithSameIP: null
           });
 
-          Discourse.ajax("/admin/users/delete-others-with-same-ip.json", {
+          ajax("/admin/users/delete-others-with-same-ip.json", {
             type: "DELETE",
             data: {
               "ip": self.get("ip"),

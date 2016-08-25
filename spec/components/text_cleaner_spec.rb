@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 require 'text_cleaner'
 
 describe TextCleaner do
@@ -185,6 +185,14 @@ describe TextCleaner do
 
       it "removes extraneous space before the end punctuation" do
         expect(TextCleaner.clean_title("Hello there ?")).to eq("Hello there?")
+      end
+
+      it "replaces all upper case unicode text with regular unicode case letters" do
+        expect(TextCleaner.clean_title("INVESTIGAÇÃO POLÍTICA NA CÂMARA")).to eq("Investigação política na câmara")
+      end
+
+      it "capitalizes first unicode letter" do
+        expect(TextCleaner.clean_title("épico encontro")).to eq("Épico encontro")
       end
 
     end

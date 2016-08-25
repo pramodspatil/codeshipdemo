@@ -1,15 +1,14 @@
+import { ajax } from 'discourse/lib/ajax';
 import RestModel from 'discourse/models/rest';
 import { popupAjaxError } from 'discourse/lib/ajax-error';
 import ActionSummary from 'discourse/models/action-summary';
 import { url, propertyEqual } from 'discourse/lib/computed';
 import Quote from 'discourse/lib/quote';
 import computed from 'ember-addons/ember-computed-decorators';
+import { postUrl } from 'discourse/lib/utilities';
+import { cook } from 'discourse/lib/text';
 
 const Post = RestModel.extend({
-
-  init() {
-    this.set('replyHistory', []);
-  },
 
   @computed()
   siteSettings() {
@@ -35,11 +34,6 @@ const Post = RestModel.extend({
   deletedViaTopic: Em.computed.and('firstPost', 'topic.deleted_at'),
   deleted: Em.computed.or('deleted_at', 'deletedViaTopic'),
   notDeleted: Em.computed.not('deleted'),
-  userDeleted: Em.computed.empty('user_id'),
-
-  hasTimeGap: function() {
-    return (this.get('daysSincePrevious') || 0) > Discourse.SiteSettings.show_time_gap_days;
-  }.property('daysSincePrevious'),
 
   showName: function() {
     const name = this.get('name');
@@ -57,36 +51,24 @@ const Post = RestModel.extend({
   }.property('firstPost', 'deleted_at', 'topic.deleted_at'),
 
   url: function() {
-    return Discourse.Utilities.postUrl(this.get('topic.slug') || this.get('topic_slug'), this.get('topic_id'), this.get('post_number'));
+    return postUrl(this.get('topic.slug') || this.get('topic_slug'), this.get('topic_id'), this.get('post_number'));
   }.property('post_number', 'topic_id', 'topic.slug'),
 
   // Don't drop the /1
   @computed('post_number', 'url')
-  urlWithNumber(postNumber, postUrl) {
-    return postNumber === 1 ? postUrl + "/1" : postUrl;
+  urlWithNumber(postNumber, baseUrl) {
+    return postNumber === 1 ? baseUrl + "/1" : baseUrl;
   },
 
   usernameUrl: url('username', '/users/%@'),
 
-  showUserReplyTab: function() {
-    return this.get('reply_to_user') && (
-      !Discourse.SiteSettings.suppress_reply_directly_above ||
-      this.get('reply_to_post_number') < (this.get('post_number') - 1)
-    );
-  }.property('reply_to_user', 'reply_to_post_number', 'post_number'),
-
   topicOwner: propertyEqual('topic.details.created_by.id', 'user_id'),
-  hasHistory: Em.computed.gt('version', 1),
-
-  canViewRawEmail: function() {
-    return this.get("user_id") === Discourse.User.currentProp("id") || Discourse.User.currentProp('staff');
-  }.property("user_id"),
 
   updatePostField(field, value) {
     const data = {};
     data[field] = value;
 
-    Discourse.ajax(`/posts/${this.get('id')}/${field}`, { type: 'PUT', data }).then(() => {
+    return ajax(`/posts/${this.get('id')}/${field}`, { type: 'PUT', data }).then(() => {
       this.set(field, value);
       this.incrementProperty("version");
     }).catch(popupAjaxError);
@@ -97,26 +79,12 @@ const Post = RestModel.extend({
     return this.get('link_counts').filterProperty('internal').filterProperty('title');
   }.property('link_counts.@each.internal'),
 
-  // Edits are the version - 1, so version 2 = 1 edit
-  editCount: function() { return this.get('version') - 1; }.property('version'),
-
   flagsAvailable: function() {
     const post = this;
     return Discourse.Site.currentProp('flagTypes').filter(function(item) {
       return post.get("actionByName." + item.get('name_key') + ".can_act");
     });
   }.property('actions_summary.@each.can_act'),
-
-  actionsWithoutLikes: function() {
-    if (!!Ember.isEmpty(this.get('actions_summary'))) return null;
-
-    return this.get('actions_summary').filter(function(i) {
-      if (i.get('count') === 0) return false;
-      if (i.get('actionType.name_key') === 'like') { return false; }
-      if (i.get('users') && i.get('users').length > 0) return true;
-      return !i.get('hidden');
-    });
-  }.property('actions_summary.@each.users', 'actions_summary.@each.count'),
 
   afterUpdate(res) {
     if (res.category) {
@@ -132,7 +100,9 @@ const Post = RestModel.extend({
   },
 
   createProperties() {
-    const data = this.getProperties(Discourse.Composer.serializedFieldsForCreate());
+    // composer only used once, defer the dependency
+    const Composer = require('discourse/models/composer').default;
+    const data = this.getProperties(Composer.serializedFieldsForCreate());
     data.reply_to_post_number = this.get('reply_to_post_number');
     data.image_sizes = this.get('imageSizes');
 
@@ -141,7 +111,7 @@ const Post = RestModel.extend({
     // Put the metaData into the request
     if (metaData) {
       data.meta_data = {};
-      Ember.keys(metaData).forEach(function(key) { data.meta_data[key] = metaData.get(key); });
+      Object.keys(metaData).forEach(function(key) { data.meta_data[key] = metaData.get(key); });
     }
 
     return data;
@@ -150,7 +120,7 @@ const Post = RestModel.extend({
   // Expands the first post's content, if embedded and shortened.
   expand() {
     const self = this;
-    return Discourse.ajax("/posts/" + this.get('id') + "/expand-embed").then(function(post) {
+    return ajax("/posts/" + this.get('id') + "/expand-embed").then(function(post) {
       self.set('cooked', "<section class='expanded-embed'>" + post.cooked + "</section>" );
     });
   },
@@ -167,7 +137,7 @@ const Post = RestModel.extend({
       can_delete: false
     });
 
-    return Discourse.ajax("/posts/" + (this.get('id')) + "/recover", { type: 'PUT', cache: false }).then(function(data){
+    return ajax("/posts/" + (this.get('id')) + "/recover", { type: 'PUT', cache: false }).then(function(data){
       post.setProperties({
         cooked: data.cooked,
         raw: data.raw,
@@ -196,8 +166,9 @@ const Post = RestModel.extend({
         can_delete: false
       });
     } else {
+
       this.setProperties({
-        cooked: Discourse.Markdown.cook(I18n.t("post.deleted_by_author", {count: Discourse.SiteSettings.delete_removed_posts_after})),
+        cooked: cook(I18n.t("post.deleted_by_author", {count: Discourse.SiteSettings.delete_removed_posts_after})),
         can_delete: false,
         version: this.get('version') + 1,
         can_recover: true,
@@ -228,7 +199,7 @@ const Post = RestModel.extend({
 
   destroy(deletedBy) {
     this.setDeletedState(deletedBy);
-    return Discourse.ajax("/posts/" + this.get('id'), {
+    return ajax("/posts/" + this.get('id'), {
       data: { context: window.location.pathname },
       type: 'DELETE'
     });
@@ -243,10 +214,6 @@ const Post = RestModel.extend({
     Object.keys(otherPost).forEach(function (key) {
       let value = otherPost[key],
           oldValue = self[key];
-
-      if (key === "replyHistory") {
-        return;
-      }
 
       if (!value) { value = null; }
       if (!oldValue) { oldValue = null; }
@@ -265,65 +232,18 @@ const Post = RestModel.extend({
     });
   },
 
-  // Load replies to this post
-  loadReplies() {
-    if(this.get('loadingReplies')){
-      return;
-    }
-
-    this.set('loadingReplies', true);
-    this.set('replies', []);
-
-    const self = this;
-    return Discourse.ajax("/posts/" + (this.get('id')) + "/replies")
-      .then(function(loaded) {
-        const replies = self.get('replies');
-        _.each(loaded,function(reply) {
-          const post = Discourse.Post.create(reply);
-          post.set('topic', self.get('topic'));
-          replies.pushObject(post);
-        });
-      })
-      ['finally'](function(){
-        self.set('loadingReplies', false);
-    });
-  },
-
-  // Whether to show replies directly below
-  showRepliesBelow: function() {
-    const replyCount = this.get('reply_count');
-
-    // We don't show replies if there aren't any
-    if (replyCount === 0) return false;
-
-    // Always show replies if the setting `suppress_reply_directly_below` is false.
-    if (!Discourse.SiteSettings.suppress_reply_directly_below) return true;
-
-    // Always show replies if there's more than one
-    if (replyCount > 1) return true;
-
-    // If we have *exactly* one reply, we have to consider if it's directly below us
-    const topic = this.get('topic');
-    return !topic.isReplyDirectlyBelow(this);
-
-  }.property('reply_count'),
-
   expandHidden() {
-    const self = this;
-    return Discourse.ajax("/posts/" + this.get('id') + "/cooked.json").then(function (result) {
-      self.setProperties({
-        cooked: result.cooked,
-        cooked_hidden: false
-      });
+    return ajax("/posts/" + this.get('id') + "/cooked.json").then(result => {
+      this.setProperties({ cooked: result.cooked, cooked_hidden: false });
     });
   },
 
   rebake() {
-    return Discourse.ajax("/posts/" + this.get("id") + "/rebake", { type: "PUT" });
+    return ajax("/posts/" + this.get("id") + "/rebake", { type: "PUT" });
   },
 
   unhide() {
-    return Discourse.ajax("/posts/" + this.get("id") + "/unhide", { type: "PUT" });
+    return ajax("/posts/" + this.get("id") + "/unhide", { type: "PUT" });
   },
 
   toggleBookmark() {
@@ -355,6 +275,10 @@ const Post = RestModel.extend({
       json = Post.munge(json);
       this.set('actions_summary', json.actions_summary);
     }
+  },
+
+  revertToRevision(version) {
+    return ajax(`/posts/${this.get('id')}/revisions/${version}/revert`, { type: 'PUT' });
   }
 
 });
@@ -388,14 +312,14 @@ Post.reopenClass({
   },
 
   updateBookmark(postId, bookmarked) {
-    return Discourse.ajax("/posts/" + postId + "/bookmark", {
+    return ajax("/posts/" + postId + "/bookmark", {
       type: 'PUT',
       data: { bookmarked: bookmarked }
     });
   },
 
   deleteMany(selectedPosts, selectedReplies) {
-    return Discourse.ajax("/posts/destroy_many", {
+    return ajax("/posts/destroy_many", {
       type: 'DELETE',
       data: {
         post_ids: selectedPosts.map(function(p) { return p.get('id'); }),
@@ -404,29 +328,37 @@ Post.reopenClass({
     });
   },
 
+  mergePosts(selectedPosts) {
+    return ajax("/posts/merge_posts", {
+      type: 'PUT',
+      data: { post_ids: selectedPosts.map(p => p.get('id')) }
+    }).catch(() => {
+      self.flash(I18n.t('topic.merge_posts.error'));
+    });
+  },
+
   loadRevision(postId, version) {
-    return Discourse.ajax("/posts/" + postId + "/revisions/" + version + ".json")
+    return ajax("/posts/" + postId + "/revisions/" + version + ".json")
                     .then(result => Ember.Object.create(result));
   },
 
   hideRevision(postId, version) {
-    return Discourse.ajax("/posts/" + postId + "/revisions/" + version + "/hide", { type: 'PUT' });
+    return ajax("/posts/" + postId + "/revisions/" + version + "/hide", { type: 'PUT' });
   },
 
   showRevision(postId, version) {
-    return Discourse.ajax("/posts/" + postId + "/revisions/" + version + "/show", { type: 'PUT' });
+    return ajax("/posts/" + postId + "/revisions/" + version + "/show", { type: 'PUT' });
   },
 
   loadQuote(postId) {
-    return Discourse.ajax("/posts/" + postId + ".json").then(result => {
+    return ajax("/posts/" + postId + ".json").then(result => {
       const post = Discourse.Post.create(result);
       return Quote.build(post, post.get('raw'), {raw: true, full: true});
     });
   },
 
   loadRawEmail(postId) {
-    return Discourse.ajax("/posts/" + postId + "/raw-email")
-                    .then(result => result.raw_email);
+    return ajax(`/posts/${postId}/raw-email.json`);
   }
 
 });

@@ -32,6 +32,7 @@ class Admin::BackupsController < Admin::AdminController
   rescue BackupRestore::OperationRunningError
     render json: failed_json.merge(message: I18n.t("backup.operation_already_running"))
   else
+    StaffActionLogger.new(current_user).log_backup_operation
     render json: success_json
   end
 
@@ -76,6 +77,7 @@ class Admin::BackupsController < Admin::AdminController
       client_id: params.fetch(:client_id),
       publish_to_message_bus: true,
     }
+    SiteSetting.set_and_log(:disable_emails, true, current_user)
     BackupRestore.restore!(current_user.id, opts)
   rescue BackupRestore::OperationRunningError
     render json: failed_json.merge(message: I18n.t("backup.operation_already_running"))
@@ -93,7 +95,7 @@ class Admin::BackupsController < Admin::AdminController
 
   def readonly
     enable = params.fetch(:enable).to_s == "true"
-    enable ? Discourse.enable_readonly_mode : Discourse.disable_readonly_mode
+    enable ? Discourse.enable_readonly_mode(user_enabled: true) : Discourse.disable_readonly_mode(user_enabled: true)
     render nothing: true
   end
 
@@ -133,7 +135,7 @@ class Admin::BackupsController < Admin::AdminController
     # when all chunks are uploaded
     if uploaded_file_size + current_chunk_size >= total_size
       # merge all the chunks in a background thread
-      Jobs.enqueue(:backup_chunks_merger, filename: filename, identifier: identifier, chunks: chunk_number)
+      Jobs.enqueue_in(5.seconds, :backup_chunks_merger, filename: filename, identifier: identifier, chunks: chunk_number)
     end
 
     render nothing: true

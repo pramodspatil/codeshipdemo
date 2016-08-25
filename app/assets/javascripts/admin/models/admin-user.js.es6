@@ -1,37 +1,80 @@
+import { ajax } from 'discourse/lib/ajax';
+import computed from 'ember-addons/ember-computed-decorators';
 import { propertyNotEqual } from 'discourse/lib/computed';
 import { popupAjaxError } from 'discourse/lib/ajax-error';
+import ApiKey from 'admin/models/api-key';
+import Group from 'discourse/models/group';
+import TL3Requirements from 'admin/models/tl3-requirements';
 
 const AdminUser = Discourse.User.extend({
 
-  customGroups: Em.computed.filter("groups", (g) => !g.automatic && Discourse.Group.create(g)),
-  automaticGroups: Em.computed.filter("groups", (g) => g.automatic && Discourse.Group.create(g)),
+  customGroups: Ember.computed.filter("groups", g => !g.automatic && Group.create(g)),
+  automaticGroups: Ember.computed.filter("groups", g => g.automatic && Group.create(g)),
+
+  canViewProfile: Ember.computed.or("active", "staged"),
+
+  @computed("bounce_score", "reset_bounce_score_after")
+  bounceScore(bounce_score, reset_bounce_score_after) {
+    if (bounce_score > 0) {
+      return `${bounce_score} - ${moment(reset_bounce_score_after).format('LL')}`;
+    } else {
+      return bounce_score;
+    }
+  },
+
+  @computed("bounce_score")
+  bounceScoreExplanation(bounce_score) {
+    if (bounce_score === 0) {
+      return I18n.t("admin.user.bounce_score_explanation.none");
+    } else if (bounce_score < Discourse.SiteSettings.bounce_score_threshold) {
+      return I18n.t("admin.user.bounce_score_explanation.some");
+    } else {
+      return I18n.t("admin.user.bounce_score_explanation.threshold_reached");
+    }
+  },
+
+  @computed
+  bounceLink() {
+    return Discourse.getURL("/admin/email/bounced");
+  },
+
+  canResetBounceScore: Ember.computed.gt("bounce_score", 0),
+
+  resetBounceScore() {
+    return ajax(`/admin/users/${this.get("id")}/reset_bounce_score`, {
+      type: 'POST'
+    }).then(() => this.setProperties({
+      "bounce_score": 0,
+      "reset_bounce_score_after": null
+    }));
+  },
 
   generateApiKey() {
     const self = this;
-    return Discourse.ajax("/admin/users/" + this.get('id') + "/generate_api_key", {
+    return ajax("/admin/users/" + this.get('id') + "/generate_api_key", {
       type: 'POST'
     }).then(function (result) {
-      const apiKey = Discourse.ApiKey.create(result.api_key);
+      const apiKey = ApiKey.create(result.api_key);
       self.set('api_key', apiKey);
       return apiKey;
     });
   },
 
   groupAdded(added) {
-    return Discourse.ajax("/admin/users/" + this.get('id') + "/groups", {
+    return ajax("/admin/users/" + this.get('id') + "/groups", {
       type: 'POST',
       data: { group_id: added.id }
     }).then(() => this.get('groups').pushObject(added));
   },
 
   groupRemoved(groupId) {
-    return Discourse.ajax("/admin/users/" + this.get('id') + "/groups/" + groupId, {
+    return ajax("/admin/users/" + this.get('id') + "/groups/" + groupId, {
       type: 'DELETE'
     }).then(() => this.set('groups.[]', this.get('groups').rejectBy("id", groupId)));
   },
 
   revokeApiKey() {
-    return Discourse.ajax("/admin/users/" + this.get('id') + "/revoke_api_key", {
+    return ajax("/admin/users/" + this.get('id') + "/revoke_api_key", {
       type: 'DELETE'
     }).then(() => this.set('api_key', null));
   },
@@ -53,7 +96,7 @@ const AdminUser = Discourse.User.extend({
 
   deleteAllPosts() {
     const user = this,
-          message = I18n.t('admin.user.delete_all_posts_confirm', { posts: user.get('post_count'), topics: user.get('topic_count') }),
+          message = I18n.messageFormat('admin.user.delete_all_posts_confirm_MF', { "POSTS": user.get('post_count'), "TOPICS": user.get('topic_count') }),
           buttons = [{
             "label": I18n.t("composer.cancel"),
             "class": "cancel-inline",
@@ -62,7 +105,7 @@ const AdminUser = Discourse.User.extend({
             "label": '<i class="fa fa-exclamation-triangle"></i> ' + I18n.t("admin.user.delete_all_posts"),
             "class": "btn btn-danger",
             "callback": function() {
-              Discourse.ajax("/admin/users/" + user.get('id') + "/delete_all_posts", {
+              ajax("/admin/users/" + user.get('id') + "/delete_all_posts", {
                 type: 'PUT'
               }).then(() => user.set('post_count', 0));
             }
@@ -72,7 +115,7 @@ const AdminUser = Discourse.User.extend({
 
   revokeAdmin() {
     const self = this;
-    return Discourse.ajax("/admin/users/" + this.get('id') + "/revoke_admin", {
+    return ajax("/admin/users/" + this.get('id') + "/revoke_admin", {
       type: 'PUT'
     }).then(function() {
       self.setProperties({
@@ -85,7 +128,7 @@ const AdminUser = Discourse.User.extend({
 
   grantAdmin() {
     const self = this;
-    return Discourse.ajax("/admin/users/" + this.get('id') + "/grant_admin", {
+    return ajax("/admin/users/" + this.get('id') + "/grant_admin", {
       type: 'PUT'
     }).then(function() {
       self.setProperties({
@@ -98,7 +141,7 @@ const AdminUser = Discourse.User.extend({
 
   revokeModeration() {
     const self = this;
-    return Discourse.ajax("/admin/users/" + this.get('id') + "/revoke_moderation", {
+    return ajax("/admin/users/" + this.get('id') + "/revoke_moderation", {
       type: 'PUT'
     }).then(function() {
       self.setProperties({
@@ -111,7 +154,7 @@ const AdminUser = Discourse.User.extend({
 
   grantModeration() {
     const self = this;
-    return Discourse.ajax("/admin/users/" + this.get('id') + "/grant_moderation", {
+    return ajax("/admin/users/" + this.get('id') + "/grant_moderation", {
       type: 'PUT'
     }).then(function() {
       self.setProperties({
@@ -123,14 +166,14 @@ const AdminUser = Discourse.User.extend({
   },
 
   refreshBrowsers() {
-    return Discourse.ajax("/admin/users/" + this.get('id') + "/refresh_browsers", {
+    return ajax("/admin/users/" + this.get('id') + "/refresh_browsers", {
       type: 'POST'
     }).finally(() => bootbox.alert(I18n.t("admin.user.refresh_browsers_message")));
   },
 
   approve() {
     const self = this;
-    return Discourse.ajax("/admin/users/" + this.get('id') + "/approve", {
+    return ajax("/admin/users/" + this.get('id') + "/approve", {
       type: 'PUT'
     }).then(function() {
       self.setProperties({
@@ -148,7 +191,7 @@ const AdminUser = Discourse.User.extend({
   dirty: propertyNotEqual('originalTrustLevel', 'trustLevel.id'),
 
   saveTrustLevel() {
-    return Discourse.ajax("/admin/users/" + this.id + "/trust_level", {
+    return ajax("/admin/users/" + this.id + "/trust_level", {
       type: 'PUT',
       data: { level: this.get('trustLevel.id') }
     }).then(function() {
@@ -168,7 +211,7 @@ const AdminUser = Discourse.User.extend({
   },
 
   lockTrustLevel(locked) {
-    return Discourse.ajax("/admin/users/" + this.id + "/trust_level_lock", {
+    return ajax("/admin/users/" + this.id + "/trust_level_lock", {
       type: 'PUT',
       data: { locked: !!locked }
     }).then(function() {
@@ -197,14 +240,14 @@ const AdminUser = Discourse.User.extend({
   }.property('suspended_till', 'suspended_at'),
 
   suspend(duration, reason) {
-    return Discourse.ajax("/admin/users/" + this.id + "/suspend", {
+    return ajax("/admin/users/" + this.id + "/suspend", {
       type: 'PUT',
       data: { duration: duration, reason: reason }
     });
   },
 
   unsuspend() {
-    return Discourse.ajax("/admin/users/" + this.id + "/unsuspend", {
+    return ajax("/admin/users/" + this.id + "/unsuspend", {
       type: 'PUT'
     }).then(function() {
       window.location.reload();
@@ -215,7 +258,7 @@ const AdminUser = Discourse.User.extend({
   },
 
   log_out() {
-    return Discourse.ajax("/admin/users/" + this.id + "/log_out", {
+    return ajax("/admin/users/" + this.id + "/log_out", {
       type: 'POST',
       data: { username_or_email: this.get('username') }
     }).then(function() {
@@ -224,11 +267,11 @@ const AdminUser = Discourse.User.extend({
   },
 
   impersonate() {
-    return Discourse.ajax("/admin/impersonate", {
+    return ajax("/admin/impersonate", {
       type: 'POST',
       data: { username_or_email: this.get('username') }
     }).then(function() {
-      document.location = Discourse.BaseUri;
+      document.location = Discourse.getURL("/");
     }).catch(function(e) {
       if (e.status === 404) {
         bootbox.alert(I18n.t('admin.impersonate.not_found'));
@@ -239,7 +282,7 @@ const AdminUser = Discourse.User.extend({
   },
 
   activate() {
-    return Discourse.ajax('/admin/users/' + this.id + '/activate', {
+    return ajax('/admin/users/' + this.id + '/activate', {
       type: 'PUT'
     }).then(function() {
       window.location.reload();
@@ -250,7 +293,7 @@ const AdminUser = Discourse.User.extend({
   },
 
   deactivate() {
-    return Discourse.ajax('/admin/users/' + this.id + '/deactivate', {
+    return ajax('/admin/users/' + this.id + '/deactivate', {
       type: 'PUT'
     }).then(function() {
       window.location.reload();
@@ -261,7 +304,8 @@ const AdminUser = Discourse.User.extend({
   },
 
   unblock() {
-    return Discourse.ajax('/admin/users/' + this.id + '/unblock', {
+    this.set('blockingUser', true);
+    return ajax('/admin/users/' + this.id + '/unblock', {
       type: 'PUT'
     }).then(function() {
       window.location.reload();
@@ -272,18 +316,37 @@ const AdminUser = Discourse.User.extend({
   },
 
   block() {
-    return Discourse.ajax('/admin/users/' + this.id + '/block', {
-      type: 'PUT'
-    }).then(function() {
-      window.location.reload();
-    }).catch(function(e) {
-      var error = I18n.t('admin.user.block_failed', { error: "http: " + e.status + " - " + e.body });
-      bootbox.alert(error);
-    });
+    const user = this,
+          message = I18n.t("admin.user.block_confirm");
+
+    const performBlock = function() {
+      user.set('blockingUser', true);
+      return ajax('/admin/users/' + user.id + '/block', {
+        type: 'PUT'
+      }).then(function() {
+        window.location.reload();
+      }).catch(function(e) {
+        var error = I18n.t('admin.user.block_failed', { error: "http: " + e.status + " - " + e.body });
+        bootbox.alert(error);
+        user.set('blockingUser', false);
+      });
+    };
+
+    const buttons = [{
+      "label": I18n.t("composer.cancel"),
+      "class": "cancel",
+      "link":  true
+    }, {
+      "label": '<i class="fa fa-exclamation-triangle"></i>' + I18n.t('admin.user.block_accept'),
+      "class": "btn btn-danger",
+      "callback": function() { performBlock(); }
+    }];
+
+    bootbox.dialog(message, buttons, { "classes": "delete-user-modal" });
   },
 
   sendActivationEmail() {
-    return Discourse.ajax('/users/action/send_activation_email', {
+    return ajax('/users/action/send_activation_email', {
       type: 'POST',
       data: { username: this.get('username') }
     }).then(function() {
@@ -298,12 +361,12 @@ const AdminUser = Discourse.User.extend({
           message = I18n.t("admin.user.anonymize_confirm");
 
     const performAnonymize = function() {
-      return Discourse.ajax("/admin/users/" + user.get('id') + '/anonymize.json', {
+      return ajax("/admin/users/" + user.get('id') + '/anonymize.json', {
         type: 'PUT'
       }).then(function(data) {
         if (data.success) {
           if (data.username) {
-            document.location = Discourse.getURL("/admin/users/" + data.username);
+            document.location = Discourse.getURL("/admin/users/" + user.get('id') + "/" + data.username);
           } else {
             document.location = Discourse.getURL("/admin/users/list/active");
           }
@@ -360,7 +423,7 @@ const AdminUser = Discourse.User.extend({
       if (opts && opts.deletePosts) {
         formData["delete_posts"] = true;
       }
-      return Discourse.ajax("/admin/users/" + user.get('id') + '.json', {
+      return ajax("/admin/users/" + user.get('id') + '.json', {
         type: 'DELETE',
         data: formData
       }).then(function(data) {
@@ -377,7 +440,7 @@ const AdminUser = Discourse.User.extend({
           }
         }
       }).catch(function() {
-        Discourse.AdminUser.find( user.get('username') ).then(function(u){ user.setProperties(u); });
+        AdminUser.find(user.get('id')).then(u => user.setProperties(u));
         bootbox.alert(I18n.t("admin.user.delete_failed"));
       });
     };
@@ -404,13 +467,13 @@ const AdminUser = Discourse.User.extend({
 
     user.checkEmail().then(function() {
       const data = {
-        posts: user.get('post_count'),
-        topics: user.get('topic_count'),
+        "POSTS": user.get('post_count'),
+        "TOPICS": user.get('topic_count'),
         email: user.get('email') || I18n.t("flagging.hidden_email_address"),
         ip_address: user.get('ip_address') || I18n.t("flagging.ip_address_missing")
         };
 
-      const message = I18n.t('flagging.delete_confirm', data),
+      const message = I18n.messageFormat('flagging.delete_confirm_MF', data),
             buttons = [{
         "label": I18n.t("composer.cancel"),
         "class": "cancel-inline",
@@ -419,7 +482,7 @@ const AdminUser = Discourse.User.extend({
         "label": '<i class="fa fa-exclamation-triangle"></i> ' + I18n.t("flagging.yes_delete_spammer"),
         "class": "btn btn-danger",
         "callback": function() {
-          return Discourse.ajax("/admin/users/" + user.get('id') + '.json', {
+          return ajax("/admin/users/" + user.get('id') + '.json', {
             type: 'DELETE',
             data: {
               delete_posts: true,
@@ -450,7 +513,7 @@ const AdminUser = Discourse.User.extend({
 
     if (user.get('loadedDetails')) { return Ember.RSVP.resolve(user); }
 
-    return Discourse.AdminUser.find(user.get('username_lower')).then(function (result) {
+    return AdminUser.find(user.get('id')).then(result => {
       user.setProperties(result);
       user.set('loadedDetails', true);
     });
@@ -458,19 +521,19 @@ const AdminUser = Discourse.User.extend({
 
   tl3Requirements: function() {
     if (this.get('tl3_requirements')) {
-      return Discourse.TL3Requirements.create(this.get('tl3_requirements'));
+      return TL3Requirements.create(this.get('tl3_requirements'));
     }
   }.property('tl3_requirements'),
 
   suspendedBy: function() {
     if (this.get('suspended_by')) {
-      return Discourse.AdminUser.create(this.get('suspended_by'));
+      return AdminUser.create(this.get('suspended_by'));
     }
   }.property('suspended_by'),
 
   approvedBy: function() {
     if (this.get('approved_by')) {
-      return Discourse.AdminUser.create(this.get('approved_by'));
+      return AdminUser.create(this.get('approved_by'));
     }
   }.property('approved_by')
 
@@ -487,7 +550,7 @@ AdminUser.reopenClass({
       });
     });
 
-    return Discourse.ajax("/admin/users/approve-bulk", {
+    return ajax("/admin/users/approve-bulk", {
       type: 'PUT',
       data: { users: users.map((u) => u.id) }
     }).finally(() => bootbox.alert(I18n.t("admin.user.approve_bulk_success")));
@@ -499,7 +562,7 @@ AdminUser.reopenClass({
       user.set('selected', false);
     });
 
-    return Discourse.ajax("/admin/users/reject-bulk", {
+    return ajax("/admin/users/reject-bulk", {
       type: 'DELETE',
       data: {
         users: users.map((u) => u.id),
@@ -508,18 +571,18 @@ AdminUser.reopenClass({
     });
   },
 
-  find(username) {
-    return Discourse.ajax("/admin/users/" + username + ".json").then(function (result) {
+  find(user_id) {
+    return ajax("/admin/users/" + user_id + ".json").then(result => {
       result.loadedDetails = true;
-      return Discourse.AdminUser.create(result);
+      return AdminUser.create(result);
     });
   },
 
   findAll(query, filter) {
-    return Discourse.ajax("/admin/users/list/" + query + ".json", {
+    return ajax("/admin/users/list/" + query + ".json", {
       data: filter
     }).then(function(users) {
-      return users.map((u) => Discourse.AdminUser.create(u));
+      return users.map((u) => AdminUser.create(u));
     });
   }
 });

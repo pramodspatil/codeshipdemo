@@ -40,7 +40,7 @@ export default Ember.ArrayController.extend({
     return _(expanded).sortBy(group => group.granted_at).reverse().value();
 
 
-  }.property('model', 'model.@each', 'model.expandedBadges.@each'),
+  }.property('model', 'model.[]', 'model.expandedBadges.[]'),
 
   /**
     Array of badges that have not been granted to this user.
@@ -61,8 +61,8 @@ export default Ember.ArrayController.extend({
       }
     });
 
-    return _.sortBy(badges, badge => badge.get('displayName'));
-  }.property('badges.@each', 'model.@each'),
+    return _.sortBy(badges, badge => badge.get('name'));
+  }.property('badges.[]', 'model.[]'),
 
   /**
     Whether there are any badges that can be granted.

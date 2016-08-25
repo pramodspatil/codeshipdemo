@@ -1,3 +1,4 @@
+import { ajax } from 'discourse/lib/ajax';
 const SiteSetting = Discourse.Model.extend({
   overridden: function() {
     let val = this.get('value'),
@@ -28,14 +29,14 @@ const SiteSetting = Discourse.Model.extend({
 
 SiteSetting.reopenClass({
   findAll() {
-    return Discourse.ajax("/admin/site_settings").then(function (settings) {
+    return ajax("/admin/site_settings").then(function (settings) {
       // Group the results by category
       const categories = {};
       settings.site_settings.forEach(function(s) {
         if (!categories[s.category]) {
           categories[s.category] = [];
         }
-        categories[s.category].pushObject(Discourse.SiteSetting.create(s));
+        categories[s.category].pushObject(SiteSetting.create(s));
       });
 
       return Object.keys(categories).map(function(n) {
@@ -47,7 +48,7 @@ SiteSetting.reopenClass({
   update(key, value) {
     const data = {};
     data[key] = value;
-    return Discourse.ajax("/admin/site_settings/" + key, { type: 'PUT', data });
+    return ajax("/admin/site_settings/" + key, { type: 'PUT', data });
   }
 });
 

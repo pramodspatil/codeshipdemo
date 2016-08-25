@@ -1,4 +1,5 @@
-import registerUnbound from 'discourse/helpers/register-unbound';
+import { h } from 'virtual-dom';
+import { registerUnbound } from 'discourse/lib/helpers';
 
 function iconClasses(icon, params) {
   var classes = "fa fa-" + icon;
@@ -7,10 +8,11 @@ function iconClasses(icon, params) {
   return classes;
 }
 
-function iconHTML(icon, params) {
+export function iconHTML(icon, params) {
   params = params || {};
 
   var html = "<i class='" + iconClasses(icon, params) + "'";
+  if (params.title) { html += ` title='${I18n.t(params.title)}'`; }
   if (params.label) { html += " aria-hidden='true'"; }
   html += "></i>";
   if (params.label) {
@@ -19,12 +21,23 @@ function iconHTML(icon, params) {
   return html;
 }
 
-Ember.Handlebars.helper('fa-icon-bound', function(value, options) {
-  return new Handlebars.SafeString(iconHTML(value, options));
-});
+export function iconNode(icon, params) {
+  params = params ||  {};
+
+  const properties = {
+    className: iconClasses(icon, params),
+    attributes: { "aria-hidden": true }
+  };
+
+  if (params.title) { properties.attributes.title = params.title; }
+
+  if (params.label) {
+    return h('i', properties, h('span.sr-only', I18n.t(params.label)));
+  } else {
+    return h('i', properties);
+  }
+}
 
 registerUnbound('fa-icon', function(icon, params) {
   return new Handlebars.SafeString(iconHTML(icon, params));
 });
-
-export { iconHTML };

@@ -1,3 +1,6 @@
+import PreloadStore from 'preload-store';
+import { ajax } from 'discourse/lib/ajax';
+
 const CategoryList = Ember.ArrayProxy.extend({
   init() {
     this.set('content', []);
@@ -7,11 +10,21 @@ const CategoryList = Ember.ArrayProxy.extend({
 
 CategoryList.reopenClass({
   categoriesFrom(store, result) {
-    const categories = Discourse.CategoryList.create();
-    const users = Discourse.Model.extractByKey(result.featured_users, Discourse.User);
+    const categories = CategoryList.create();
     const list = Discourse.Category.list();
 
-    result.category_list.categories.forEach(function(c) {
+    let statPeriod;
+    const minCategories = result.category_list.categories.length * 0.8;
+
+    ["week", "month"].some(period => {
+      const filteredCategories = result.category_list.categories.filter(c => c[`topics_${period}`] > 0);
+      if (filteredCategories.length >= minCategories) {
+        statPeriod = period;
+        return true;
+      }
+    });
+
+    result.category_list.categories.forEach(c => {
       if (c.parent_category_id) {
         c.parentCategory = list.findBy('id', c.parent_category_id);
       }
@@ -20,12 +33,24 @@ CategoryList.reopenClass({
         c.subcategories = c.subcategory_ids.map(scid => list.findBy('id', parseInt(scid, 10)));
       }
 
-      if (c.featured_user_ids) {
-        c.featured_users = c.featured_user_ids.map(u => users[u]);
-      }
-
       if (c.topics) {
         c.topics = c.topics.map(t => Discourse.Topic.create(t));
+      }
+
+      switch(statPeriod) {
+        case "week":
+        case "month":
+          const stat = c[`topics_${statPeriod}`];
+          const unit = I18n.t(statPeriod);
+          if (stat > 0) {
+            c.stat = `<span class="value">${stat}</span> / <span class="unit">${unit}</span>`;
+            c.statTitle = I18n.t("categories.topic_stat_sentence", { count: stat, unit: unit });
+            break;
+          }
+        default:
+          c.stat = `<span class="value">${c.topic_count}</span>`;
+          c.statTitle = I18n.t("categories.topic_sentence", { count: c.topic_count });
+          break;
       }
 
       categories.pushObject(store.createRecord('category', c));
@@ -34,8 +59,8 @@ CategoryList.reopenClass({
   },
 
   listForParent(store, category) {
-    return Discourse.ajax(`/categories.json?parent_category_id=${category.get("id")}`).then(result => {
-      return Discourse.CategoryList.create({
+    return ajax(`/categories.json?parent_category_id=${category.get("id")}`).then(result => {
+      return CategoryList.create({
         categories: this.categoriesFrom(store, result),
         parentCategory: category
       });
@@ -43,9 +68,9 @@ CategoryList.reopenClass({
   },
 
   list(store) {
-    const getCategories = () => Discourse.ajax("/categories.json");
+    const getCategories = () => ajax("/categories.json");
     return PreloadStore.getAndRemove("categories_list", getCategories).then(result => {
-      return Discourse.CategoryList.create({
+      return CategoryList.create({
         categories: this.categoriesFrom(store, result),
         can_create_category: result.category_list.can_create_category,
         can_create_topic: result.category_list.can_create_topic,

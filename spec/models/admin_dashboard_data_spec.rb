@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe AdminDashboardData do
 
@@ -66,20 +66,6 @@ describe AdminDashboardData do
 
     it 'returns a string when host_name is production.localhost' do
       Discourse.stubs(:current_hostname).returns('production.localhost')
-      expect(subject).to_not be_nil
-    end
-  end
-
-  describe 'gc_checks' do
-    subject { described_class.new.gc_checks }
-
-    it 'returns nil when gc params are set' do
-      ENV.stubs(:[]).with('RUBY_GC_MALLOC_LIMIT').returns(90000000)
-      expect(subject).to be_nil
-    end
-
-    it 'returns a string when gc params are not set' do
-      ENV.stubs(:[]).with('RUBY_GC_MALLOC_LIMIT').returns(nil)
       expect(subject).to_not be_nil
     end
   end
@@ -276,6 +262,28 @@ describe AdminDashboardData do
 
   describe 'stats cache' do
     include_examples 'stats cachable'
+  end
+
+  describe '#problem_message_check' do
+    let(:key) { AdminDashboardData.problem_messages.first }
+
+    before do
+      described_class.clear_problem_message(key)
+    end
+
+    it 'returns nil if message has not been added' do
+      expect(described_class.problem_message_check(key)).to be_nil
+    end
+
+    it 'returns a message if it was added' do
+      described_class.add_problem_message(key)
+      expect(described_class.problem_message_check(key)).to eq(I18n.t(key))
+    end
+
+    it 'returns a message if it was added with an expiry' do
+      described_class.add_problem_message(key, 300)
+      expect(described_class.problem_message_check(key)).to eq(I18n.t(key))
+    end
   end
 
 end

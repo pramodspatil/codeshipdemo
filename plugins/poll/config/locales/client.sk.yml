@@ -1,0 +1,36 @@
+# encoding: utf-8
+#
+# Never edit this file. It will be overwritten when translations are pulled from Transifex.
+#
+# To work with us on translations, join this project:
+# https://www.transifex.com/projects/p/discourse-org/
+
+sk:
+  js:
+    poll:
+      voters:
+        one: "volič"
+        few: "voliči"
+        other: "voliči"
+      total_votes:
+        one: "hlas celkom"
+        few: "hlasy celkom"
+        other: "hlasov celkom"
+      average_rating: "Priemerné hodnotenie: <strong>%{average}</strong>."
+      cast-votes:
+        title: "Hlasovať"
+        label: "Hlasuj teraz!"
+      show-results:
+        title: "Zobraz výsledky hlasovania"
+        label: "Zobraz výsledky"
+      hide-results:
+        title: "Návrat na odovzdané hlasy"
+        label: "Skyť výsledky"
+      open:
+        title: "Zahájiť hlasovanie"
+        label: "Zahájiť"
+        confirm: "Ste si istý, že chcete zahájiť toto hlasovanie?"
+      close:
+        title: "Zatvoriť hlasovanie"
+        label: "Zatvoriť"
+        confirm: "Ste si istý, že chcete zatvoriť toto hlasovanie?"

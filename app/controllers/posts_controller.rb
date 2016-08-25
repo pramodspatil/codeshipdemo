@@ -1,15 +1,16 @@
 require_dependency 'new_post_manager'
 require_dependency 'post_creator'
 require_dependency 'post_destroyer'
+require_dependency 'post_merger'
 require_dependency 'distributed_memoizer'
 require_dependency 'new_post_result_serializer'
 
 class PostsController < ApplicationController
 
   # Need to be logged in for all actions here
-  before_filter :ensure_logged_in, except: [:show, :replies, :by_number, :short_link, :reply_history, :revisions, :latest_revision, :expand_embed, :markdown_id, :markdown_num, :cooked, :latest]
+  before_filter :ensure_logged_in, except: [:show, :replies, :by_number, :short_link, :reply_history, :revisions, :latest_revision, :expand_embed, :markdown_id, :markdown_num, :cooked, :latest, :user_posts_feed]
 
-  skip_before_filter :preload_json, :check_xhr, only: [:markdown_id, :markdown_num, :short_link, :latest]
+  skip_before_filter :preload_json, :check_xhr, only: [:markdown_id, :markdown_num, :short_link, :latest, :user_posts_feed]
 
   def markdown_id
     markdown Post.find(params[:id].to_i)
@@ -37,14 +38,29 @@ class PostsController < ApplicationController
     last_post_id = params[:before].to_i
     last_post_id = Post.last.id if last_post_id <= 0
 
-    # last 50 post IDs only, to avoid counting deleted posts in security check
-    posts = Post.order(created_at: :desc)
-                .where('posts.id <= ?', last_post_id)
-                .where('posts.id > ?', last_post_id - 50)
-                .includes(topic: :category)
-                .includes(user: :primary_group)
-                .includes(:reply_to_user)
-                .limit(50)
+    if params[:id] == "private_posts"
+      raise Discourse::NotFound if current_user.nil?
+      posts = Post.private_posts
+                  .order(created_at: :desc)
+                  .where('posts.id <= ?', last_post_id)
+                  .where('posts.id > ?', last_post_id - 50)
+                  .includes(topic: :category)
+                  .includes(user: :primary_group)
+                  .includes(:reply_to_user)
+                  .limit(50)
+      rss_description = I18n.t("rss_description.private_posts")
+    else
+      posts = Post.public_posts
+                  .order(created_at: :desc)
+                  .where('posts.id <= ?', last_post_id)
+                  .where('posts.id > ?', last_post_id - 50)
+                  .includes(topic: :category)
+                  .includes(user: :primary_group)
+                  .includes(:reply_to_user)
+                  .limit(50)
+      rss_description = I18n.t("rss_description.posts")
+    end
+
     # Remove posts the user doesn't have permission to see
     # This isn't leaking any information we weren't already through the post ID numbers
     posts = posts.reject { |post| !guardian.can_see?(post) || post.topic.blank? }
@@ -53,16 +69,16 @@ class PostsController < ApplicationController
     respond_to do |format|
       format.rss do
         @posts = posts
-        @title = "#{SiteSetting.title} - #{I18n.t("rss_description.posts")}"
+        @title = "#{SiteSetting.title} - #{rss_description}"
         @link = Discourse.base_url
-        @description = I18n.t("rss_description.posts")
+        @description = rss_description
         render 'posts/latest', formats: [:rss]
       end
       format.json do
         render_json_dump(serialize_data(posts,
                                         PostSerializer,
                                         scope: guardian,
-                                        root: 'latest_posts',
+                                        root: params[:id],
                                         add_raw: true,
                                         add_title: true,
                                         all_post_actions: counts)
@@ -71,15 +87,36 @@ class PostsController < ApplicationController
     end
   end
 
+  def user_posts_feed
+    params.require(:username)
+    user = fetch_user_from_params
+
+    posts = Post.public_posts
+                .where(user_id: user.id)
+                .where(post_type: Post.types[:regular])
+                .order(created_at: :desc)
+                .includes(:user)
+                .includes(topic: :category)
+                .limit(50)
+
+    posts = posts.reject { |post| !guardian.can_see?(post) || post.topic.blank? }
+
+    @posts = posts
+    @title = "#{SiteSetting.title} - #{I18n.t("rss_description.user_posts", username: user.username)}"
+    @link = "#{Discourse.base_url}/users/#{user.username}/activity"
+    @description = I18n.t("rss_description.user_posts", username: user.username)
+    render 'posts/latest', formats: [:rss]
+  end
+
   def cooked
     post = find_post_from_params
     render json: {cooked: post.cooked}
   end
 
   def raw_email
-    post = Post.find(params[:id].to_i)
+    post = Post.unscoped.find(params[:id].to_i)
     guardian.ensure_can_view_raw_email!(post)
-    render json: {raw_email: post.raw_email}
+    render json: { raw_email: post.raw_email }
   end
 
   def short_link
@@ -95,14 +132,6 @@ class PostsController < ApplicationController
   end
 
   def create
-
-    if !is_api? && current_user.blocked?
-
-      # error has parity with what user would get if they posted when blocked
-      # and it went through post creator
-      render json: {errors: [I18n.t("topic_not_found")]}, status: 422
-      return
-    end
 
     @manager_params = create_params
     @manager_params[:first_post_checks] = !is_api?
@@ -245,6 +274,14 @@ class PostsController < ApplicationController
     render nothing: true
   end
 
+  def merge_posts
+    params.require(:post_ids)
+    posts = Post.where(id: params[:post_ids]).order(:id)
+    raise Discourse::InvalidParameters.new(:post_ids) if posts.pluck(:id) == params[:post_ids]
+    PostMerger.new(current_user, posts).merge
+    render nothing: true
+  end
+
   # Direct replies to this post
   def replies
     post = find_post_from_params
@@ -290,6 +327,55 @@ class PostsController < ApplicationController
     render nothing: true
   end
 
+  def revert
+    raise Discourse::NotFound unless guardian.is_staff?
+
+    post_id = params[:id] || params[:post_id]
+    revision = params[:revision].to_i
+    raise Discourse::InvalidParameters.new(:revision) if revision < 2
+
+    post_revision = PostRevision.find_by(post_id: post_id, number: revision)
+    raise Discourse::NotFound unless post_revision
+
+    post = find_post_from_params
+    raise Discourse::NotFound if post.blank?
+
+    post_revision.post = post
+    guardian.ensure_can_see!(post_revision)
+    guardian.ensure_can_edit!(post)
+    return render_json_error(I18n.t('revert_version_same')) if post_revision.modifications["raw"].blank? && post_revision.modifications["title"].blank? && post_revision.modifications["category_id"].blank?
+
+    topic = Topic.with_deleted.find(post.topic_id)
+
+    changes = {}
+    changes[:raw] = post_revision.modifications["raw"][0] if post_revision.modifications["raw"].present? && post_revision.modifications["raw"][0] != post.raw
+    if post.is_first_post?
+      changes[:title] = post_revision.modifications["title"][0] if post_revision.modifications["title"].present? && post_revision.modifications["title"][0] != topic.title
+      changes[:category_id] = post_revision.modifications["category_id"][0] if post_revision.modifications["category_id"].present? && post_revision.modifications["category_id"][0] != topic.category.id
+    end
+    return render_json_error(I18n.t('revert_version_same')) unless changes.length > 0
+    changes[:edit_reason] = "reverted to version ##{post_revision.number.to_i - 1}"
+
+    revisor = PostRevisor.new(post, topic)
+    revisor.revise!(current_user, changes)
+
+    return render_json_error(post) if post.errors.present?
+    return render_json_error(topic) if topic.errors.present?
+
+    post_serializer = PostSerializer.new(post, scope: guardian, root: false)
+    post_serializer.draft_sequence = DraftSequence.current(current_user, topic.draft_key)
+    link_counts = TopicLink.counts_for(guardian, topic, [post])
+    post_serializer.single_post_link_counts = link_counts[post.id] if link_counts.present?
+
+    result = { post: post_serializer.as_json }
+    if post.is_first_post?
+      result[:topic] = BasicTopicSerializer.new(topic, scope: guardian, root: false).as_json if post_revision.modifications["title"].present?
+      result[:category_id] = post_revision.modifications["category_id"][0] if post_revision.modifications["category_id"].present?
+    end
+
+    render_json_dump(result)
+  end
+
   def bookmark
     post = find_post_from_params
 
@@ -305,9 +391,9 @@ class PostsController < ApplicationController
   end
 
   def wiki
-    guardian.ensure_can_wiki!
-
     post = find_post_from_params
+    guardian.ensure_can_wiki!(post)
+
     post.revise(current_user, { wiki: params[:wiki] })
 
     render nothing: true
@@ -379,6 +465,10 @@ class PostsController < ApplicationController
     json_obj.symbolize_keys!
     if params[:nested_post].blank? && json_obj[:errors].blank? && json_obj[:action] != :enqueued
       json_obj = json_obj[:post]
+    end
+
+    if !success && GlobalSetting.try(:verbose_api_logging) && is_api?
+      Rails.logger.error "Error creating post via API:\n\n#{json_obj.inspect}"
     end
 
     render json: json_obj, status: (!!success) ? 200 : 422
@@ -463,11 +553,13 @@ class PostsController < ApplicationController
       :reply_to_post_number,
       :auto_track,
       :typing_duration_msecs,
-      :composer_open_duration_msecs
+      :composer_open_duration_msecs,
+      :visible
     ]
 
     # param munging for WordPress
     params[:auto_track] = !(params[:auto_track].to_s == "false") if params[:auto_track]
+    params[:visible] = (params[:unlist_topic].to_s == "false") if params[:unlist_topic]
 
     if api_key_valid?
       # php seems to be sending this incorrectly, don't fight with it
@@ -476,6 +568,10 @@ class PostsController < ApplicationController
 
       # We allow `embed_url` via the API
       permitted << :embed_url
+
+      # We allow `created_at` via the API
+      permitted << :created_at
+
     end
 
     params.require(:raw)
@@ -506,6 +602,14 @@ class PostsController < ApplicationController
     result[:ip_address] = request.remote_ip
     result[:user_agent] = request.user_agent
     result[:referrer] = request.env["HTTP_REFERER"]
+
+    if usernames = result[:target_usernames]
+      usernames = usernames.split(",")
+      groups = Group.mentionable(current_user).where('name in (?)', usernames).pluck('name')
+      usernames -= groups
+      result[:target_usernames] = usernames.join(",")
+      result[:target_group_names] = groups.join(",")
+    end
 
     result
   end

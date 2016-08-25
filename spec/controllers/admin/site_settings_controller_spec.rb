@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 describe Admin::SiteSettingsController do
 
@@ -44,6 +44,13 @@ describe Admin::SiteSettingsController do
         SiteSetting.expects(:'test_setting=').with('hello').once
         StaffActionLogger.any_instance.expects(:log_site_setting_change).with('test_setting', 'previous', 'hello')
         xhr :put, :update, id: 'test_setting', test_setting: 'hello'
+      end
+
+      it 'does not allow changing of hidden settings' do
+        SiteSetting.setting(:hidden_setting, "hidden", hidden: true)
+        result = xhr :put, :update, id: 'hidden_setting', hidden_setting: 'not allowed'
+        expect(SiteSetting.hidden_setting).to eq("hidden")
+        expect(result.status).to eq(422)
       end
 
       it 'fails when a setting does not exist' do

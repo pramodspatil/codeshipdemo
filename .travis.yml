@@ -24,14 +24,13 @@ matrix:
   fast_finish: true
 
 rvm:
-  - 2.0.0
-  - 2.1
-  - 2.2
+  - 2.3.1
 
 services:
   - redis-server
 
-sudo: false
+sudo: required
+dist: trusty
 
 cache:
   directories:
@@ -39,10 +38,13 @@ cache:
 
 before_install:
   - gem install bundler
+  - git clone --depth=1 https://github.com/discourse/discourse-backup-uploads-to-s3.git plugins/discourse-backup-uploads-to-s3
+  - git clone --depth=1 https://github.com/discourse/discourse-spoiler-alert.git plugins/discourse-spoiler-alert
   - npm i -g eslint babel-eslint
   - eslint app/assets/javascripts
   - eslint --ext .es6 app/assets/javascripts
   - eslint --ext .es6 test/javascripts
+  - eslint --ext .es6 plugins/**/assets/javascripts
   - eslint test/javascripts
 
 before_script:

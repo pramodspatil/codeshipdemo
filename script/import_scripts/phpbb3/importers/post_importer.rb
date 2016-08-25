@@ -4,12 +4,14 @@ module ImportScripts::PhpBB3
     # @param text_processor [ImportScripts::PhpBB3::TextProcessor]
     # @param attachment_importer [ImportScripts::PhpBB3::AttachmentImporter]
     # @param poll_importer [ImportScripts::PhpBB3::PollImporter]
+    # @param permalink_importer [ImportScripts::PhpBB3::PermalinkImporter]
     # @param settings [ImportScripts::PhpBB3::Settings]
-    def initialize(lookup, text_processor, attachment_importer, poll_importer, settings)
+    def initialize(lookup, text_processor, attachment_importer, poll_importer, permalink_importer, settings)
       @lookup = lookup
       @text_processor = text_processor
       @attachment_importer = attachment_importer
       @poll_importer = poll_importer
+      @permalink_importer = permalink_importer
       @settings = settings
     end
 
@@ -28,7 +30,8 @@ module ImportScripts::PhpBB3
         id: row[:post_id],
         user_id: user_id,
         created_at: Time.zone.at(row[:post_time]),
-        raw: @text_processor.process_post(row[:post_text], attachments)
+        raw: @text_processor.process_post(row[:post_text], attachments),
+        import_topic_id: row[:topic_id]
       }
 
       if is_first_post
@@ -51,6 +54,9 @@ module ImportScripts::PhpBB3
       mapped[:title] = CGI.unescapeHTML(row[:topic_title]).strip[0...255]
       mapped[:pinned_at] = mapped[:created_at] unless row[:topic_type] == Constants::POST_NORMAL
       mapped[:pinned_globally] = row[:topic_type] == Constants::POST_GLOBAL
+      mapped[:post_create_action] = proc do |post|
+        @permalink_importer.create_for_topic(post.topic, row[:topic_id])
+      end
 
       add_poll(row, mapped) if @settings.import_polls
       mapped
@@ -65,6 +71,10 @@ module ImportScripts::PhpBB3
       end
 
       mapped[:topic_id] = parent[:topic_id]
+      mapped[:post_create_action] = proc do |post|
+        @permalink_importer.create_for_post(post, row[:post_id])
+      end
+
       mapped
     end
 

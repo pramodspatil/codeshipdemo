@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 require 'locale_file_walker'
 
 describe "i18n integrity checks" do
@@ -16,10 +16,10 @@ describe "i18n integrity checks" do
     end
   end
 
-  it "needs an i18n key (notification_types) for each Notification type" do
-    Notification.types.each_key do |type|
-      next if type == :custom
-      expect(I18n.t("notification_types.#{type}")).not_to match(/translation missing/)
+  it "has an i18n key for each badge description" do
+    Badge.where(system: true).each do |b|
+      expect(b.long_description).to be_present
+      expect(b.description).to be_present
     end
   end
 
@@ -58,7 +58,7 @@ describe "i18n integrity checks" do
     end
   end
 
-  describe 'keys in English locale files' do
+  describe 'English locale file' do
     locale_files = ['config/locales', 'plugins/**/locales']
                      .product(['server.en.yml', 'client.en.yml'])
                      .collect { |dir, filename| Dir["#{Rails.root}/#{dir}/#{filename}"] }
@@ -85,11 +85,41 @@ describe "i18n integrity checks" do
       end
     end
 
+    module Pluralizations
+      def self.load(path)
+        whitelist = Regexp.union([/messages.restrict_dependent_destroy/])
+
+        yaml = YAML.load_file("#{Rails.root}/#{path}")
+        pluralizations = find_pluralizations(yaml['en'])
+        pluralizations.reject! { |key| key.match(whitelist) }
+        pluralizations
+      end
+
+      def self.find_pluralizations(hash, parent_key = '', pluralizations = Hash.new)
+        hash.each do |key, value|
+          if value.is_a? Hash
+            current_key = parent_key.blank? ? key : "#{parent_key}.#{key}"
+            find_pluralizations(value, current_key, pluralizations)
+          elsif key == 'one' || key == 'other'
+            pluralizations[parent_key] = hash
+          end
+        end
+
+        pluralizations
+      end
+    end
+
     locale_files.each do |path|
       context path do
         it 'has no duplicate keys' do
           duplicates = DuplicateKeyFinder.new.find_duplicates("#{Rails.root}/#{path}")
           expect(duplicates).to be_empty
+        end
+
+        Pluralizations.load(path).each do |key, values|
+          it "key '#{key}' has valid pluralizations" do
+            expect(values.keys).to contain_exactly('one', 'other')
+          end
         end
       end
     end

@@ -1,6 +1,11 @@
 import { acceptance } from "helpers/qunit-helpers";
 
-acceptance("Composer", { loggedIn: true });
+acceptance("Composer", {
+  loggedIn: true,
+  settings: {
+    enable_whispers: true
+  }
+});
 
 test("Tests the Composer controls", () => {
   visit("/");
@@ -40,6 +45,28 @@ test("Tests the Composer controls", () => {
   andThen(() => {
     equal(find('.d-editor-preview').html().trim(), "<p>this is the <em>content</em> of a post</p>", "it previews content");
     ok(exists('.d-editor-textarea-wrapper .popup-tip.good'), 'the body is now good');
+  });
+
+  andThen(() => {
+    const textarea = find('#reply-control .d-editor-input')[0];
+    textarea.selectionStart = textarea.value.length;
+    textarea.selectionEnd = textarea.value.length;
+
+    // Testing keyboard events is tough!
+    const mac = /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+    const event = document.createEvent('Event');
+    event.initEvent('keydown', true, true);
+    event[mac ? 'metaKey' : 'ctrlKey'] = true;
+    event.keyCode = 66;
+
+    textarea.dispatchEvent(event);
+  });
+
+  andThen(() => {
+    const example = I18n.t(`composer.bold_text`);
+    equal(find('#reply-control .d-editor-input').val().trim(),
+               `this is the *content* of a post**${example}**`,
+               "it supports keyboard shortcuts");
   });
 
   click('#reply-control a.cancel');
@@ -170,8 +197,8 @@ test("Edit the first post", () => {
 
   ok(!exists('.topic-post:eq(0) .post-info.edits'), 'it has no edits icon at first');
 
-  click('.topic-post:eq(0) button[data-action=showMoreActions]');
-  click('.topic-post:eq(0) button[data-action=edit]');
+  click('.topic-post:eq(0) button.show-more-actions');
+  click('.topic-post:eq(0) button.edit');
   andThen(() => {
     equal(find('.d-editor-input').val().indexOf('Any plans to support'), 0, 'it populates the input with the post text');
   });
@@ -190,11 +217,11 @@ test("Edit the first post", () => {
 test("Composer can switch between edits", () => {
   visit("/t/this-is-a-test-topic/9");
 
-  click('.topic-post:eq(0) button[data-action=edit]');
+  click('.topic-post:eq(0) button.edit');
   andThen(() => {
     equal(find('.d-editor-input').val().indexOf('This is the first post.'), 0, 'it populates the input with the post text');
   });
-  click('.topic-post:eq(1) button[data-action=edit]');
+  click('.topic-post:eq(1) button.edit');
   andThen(() => {
     equal(find('.d-editor-input').val().indexOf('This is the second post.'), 0, 'it populates the input with the post text');
   });
@@ -203,9 +230,9 @@ test("Composer can switch between edits", () => {
 test("Composer with dirty edit can toggle to another edit", () => {
   visit("/t/this-is-a-test-topic/9");
 
-  click('.topic-post:eq(0) button[data-action=edit]');
+  click('.topic-post:eq(0) button.edit');
   fillIn('.d-editor-input', 'This is a dirty reply');
-  click('.topic-post:eq(1) button[data-action=edit]');
+  click('.topic-post:eq(1) button.edit');
   andThen(() => {
     ok(exists('.bootbox.modal'), 'it pops up a confirmation dialog');
   });
@@ -218,26 +245,72 @@ test("Composer with dirty edit can toggle to another edit", () => {
 test("Composer can toggle between edit and reply", () => {
   visit("/t/this-is-a-test-topic/9");
 
-  click('.topic-post:eq(0) button[data-action=edit]');
+  click('.topic-post:eq(0) button.edit');
   andThen(() => {
     equal(find('.d-editor-input').val().indexOf('This is the first post.'), 0, 'it populates the input with the post text');
   });
-  click('.topic-post:eq(0) button[data-action=reply]');
+  click('.topic-post:eq(0) button.reply');
   andThen(() => {
     equal(find('.d-editor-input').val(), "", 'it clears the input');
   });
-  click('.topic-post:eq(0) button[data-action=edit]');
+  click('.topic-post:eq(0) button.edit');
   andThen(() => {
     equal(find('.d-editor-input').val().indexOf('This is the first post.'), 0, 'it populates the input with the post text');
+  });
+});
+
+test("Composer can toggle between reply and createTopic", () => {
+  visit("/t/this-is-a-test-topic/9");
+
+  click('.topic-post:eq(0) button.reply');
+  click('button.options');
+  click('.popup-menu .fa-eye-slash');
+  andThen(() => {
+    ok(
+      find('.composer-fields .whisper').text().indexOf(I18n.t("composer.whisper")) > 0,
+      'it sets the post type to whisper'
+    );
+  });
+
+  visit("/");
+  andThen(() => {
+    ok(exists('#create-topic'), 'the create topic button is visible');
+  });
+
+  click('#create-topic');
+  andThen(() => {
+    ok(
+      find('.composer-fields .whisper').text().indexOf(I18n.t("composer.whisper")) === -1,
+      "it should reset the state of the composer's model"
+    );
+  });
+
+  click('button.options');
+  click('.popup-menu .fa-eye-slash');
+  andThen(() => {
+    ok(
+      find('.composer-fields .whisper').text().indexOf(I18n.t("composer.unlist")) > 0,
+      'it sets the topic to unlisted'
+    );
+  });
+
+  visit("/t/this-is-a-test-topic/9");
+
+  click('.topic-post:eq(0) button.reply');
+  andThen(() => {
+    ok(
+      find('.composer-fields .whisper').text().indexOf(I18n.t("composer.unlist")) === -1,
+      "it should reset the state of the composer's model"
+    );
   });
 });
 
 test("Composer with dirty reply can toggle to edit", () => {
   visit("/t/this-is-a-test-topic/9");
 
-  click('.topic-post:eq(0) button[data-action=reply]');
+  click('.topic-post:eq(0) button.reply');
   fillIn('.d-editor-input', 'This is a dirty reply');
-  click('.topic-post:eq(0) button[data-action=edit]');
+  click('.topic-post:eq(0) button.edit');
   andThen(() => {
     ok(exists('.bootbox.modal'), 'it pops up a confirmation dialog');
   });
@@ -250,10 +323,10 @@ test("Composer with dirty reply can toggle to edit", () => {
 test("Composer draft with dirty reply can toggle to edit", () => {
   visit("/t/this-is-a-test-topic/9");
 
-  click('.topic-post:eq(0) button[data-action=reply]');
+  click('.topic-post:eq(0) button.reply');
   fillIn('.d-editor-input', 'This is a dirty reply');
   click('.toggler');
-  click('.topic-post:eq(0) button[data-action=edit]');
+  click('.topic-post:eq(0) button.edit');
   andThen(() => {
     ok(exists('.bootbox.modal'), 'it pops up a confirmation dialog');
   });

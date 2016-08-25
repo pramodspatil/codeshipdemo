@@ -1,4 +1,5 @@
 import ModalFunctionality from 'discourse/mixins/modal-functionality';
+import ActionSummary from 'discourse/models/action-summary';
 import { MAX_MESSAGE_LENGTH } from 'discourse/models/post-action-type';
 
 export default Ember.Controller.extend(ModalFunctionality, {
@@ -6,6 +7,7 @@ export default Ember.Controller.extend(ModalFunctionality, {
   selected: null,
   flagTopic: null,
   message: null,
+  isWarning: false,
   topicActionByName: null,
 
   onShow() {
@@ -14,15 +16,26 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
   flagsAvailable: function() {
     if (!this.get('flagTopic')) {
-      return this.get('model.flagsAvailable');
+      // flagging post
+      let flagsAvailable = this.get('model.flagsAvailable');
+
+      // "message user" option should be at the top
+      const notifyUserIndex = flagsAvailable.indexOf(flagsAvailable.filterProperty('name_key', 'notify_user')[0]);
+      if (notifyUserIndex !== -1) {
+        const notifyUser = flagsAvailable[notifyUserIndex];
+        flagsAvailable.splice(notifyUserIndex, 1);
+        flagsAvailable.splice(0, 0, notifyUser);
+      }
+      return flagsAvailable;
     } else {
+      // flagging topic
       const self = this,
           lookup = Em.Object.create();
 
       _.each(this.get("model.actions_summary"),function(a) {
         a.flagTopic = self.get('model');
         a.actionType = self.site.topicFlagTypeById(a.id);
-        const actionSummary = Discourse.ActionSummary.create(a);
+        const actionSummary = ActionSummary.create(a);
         lookup.set(a.actionType.get('name_key'), actionSummary);
       });
       this.set('topicActionByName', lookup);
@@ -33,6 +46,10 @@ export default Ember.Controller.extend(ModalFunctionality, {
         });
       });
     }
+  }.property('post', 'flagTopic', 'model.actions_summary.@each.can_act'),
+
+  staffFlagsAvailable: function() {
+    return (this.get('model.flagsAvailable') && this.get('model.flagsAvailable').length > 1);
   }.property('post', 'flagTopic', 'model.actions_summary.@each.can_act'),
 
   submitEnabled: function() {
@@ -73,7 +90,6 @@ export default Ember.Controller.extend(ModalFunctionality, {
     },
 
     createFlag(opts) {
-      const self = this;
       let postAction; // an instance of ActionSummary
 
       if (!this.get('flagTopic')) {
@@ -82,24 +98,30 @@ export default Ember.Controller.extend(ModalFunctionality, {
         postAction = this.get('topicActionByName.' + this.get('selected.name_key'));
       }
 
-      let params = this.get('selected.is_custom_flag') ? {message: this.get('message')} : {};
+      let params = this.get('selected.is_custom_flag') ? {message: this.get('message') } : {};
       if (opts) { params = $.extend(params, opts); }
 
       this.send('hideModal');
 
-      postAction.act(this.get('model'), params).then(function() {
-        self.send('closeModal');
+      postAction.act(this.get('model'), params).then(() => {
+        this.send('closeModal');
         if (params.message) {
-          self.set('message', '');
+          this.set('message', '');
         }
-      }, function(errors) {
-        self.send('closeModal');
+        this.appEvents.trigger('post-stream:refresh', { id: this.get('model.id') });
+      }).catch(errors => {
+        this.send('closeModal');
         if (errors && errors.responseText) {
           bootbox.alert($.parseJSON(errors.responseText).errors);
         } else {
           bootbox.alert(I18n.t('generic_error'));
         }
       });
+    },
+
+    createFlagAsWarning() {
+      this.send('createFlag', {isWarning: true});
+      this.set('model.hidden', true);
     },
 
     changePostActionType(action) {
@@ -117,6 +139,12 @@ export default Ember.Controller.extend(ModalFunctionality, {
     }
   }.property('selected.name_key', 'userDetails.can_be_deleted', 'userDetails.can_delete_all_posts'),
 
+  canSendWarning: function() {
+    if (this.get("flagTopic")) return false;
+
+    return (Discourse.User.currentProp('staff') && this.get('selected.name_key') === 'notify_user');
+  }.property('selected.name_key'),
+
   usernameChanged: function() {
     this.set('userDetails', null);
     this.fetchUserDetails();
@@ -124,8 +152,8 @@ export default Ember.Controller.extend(ModalFunctionality, {
 
   fetchUserDetails() {
     if (Discourse.User.currentProp('staff') && this.get('model.username')) {
-      Discourse.AdminUser.find(this.get('model.username').toLowerCase())
-                         .then(user => this.set('userDetails', user));
+      const AdminUser = require('admin/models/admin-user').default;
+      AdminUser.find(this.get('model.user_id')).then(user => this.set('userDetails', user));
     }
   }
 

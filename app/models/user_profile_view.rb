@@ -7,6 +7,7 @@ class UserProfileView < ActiveRecord::Base
     at ||= Time.zone.now
     redis_key = "user-profile-view:#{user_profile_id}:#{at.to_date}"
     if user_id
+      return if user_id < 1
       redis_key << ":user-#{user_id}"
     else
       redis_key << ":ip-#{ip}"
@@ -40,8 +41,13 @@ class UserProfileView < ActiveRecord::Base
     end
   end
 
-  def self.profile_views_by_day(start_date, end_date)
+  def self.profile_views_by_day(start_date, end_date, group_id=nil)
     profile_views = self.where("viewed_at >= ? AND viewed_at < ?", start_date, end_date + 1.day)
+    if group_id
+      profile_views = profile_views.joins("INNER JOIN users ON users.id = user_profile_views.user_id")
+      profile_views = profile_views.joins("INNER JOIN group_users ON group_users.user_id = users.id")
+      profile_views = profile_views.where("group_users.group_id = ?", group_id)
+    end
     profile_views.group("date(viewed_at)").order("date(viewed_at)").count
   end
 end
