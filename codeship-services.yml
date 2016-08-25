@@ -12,8 +12,6 @@ app:
     - postgresql
     - redis
   cached: true
-  volumes:
-    - ./:/code
 postgresql:
   image: postgres:9.5
 redis:

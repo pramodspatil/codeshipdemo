@@ -1,2 +1,16 @@
-tmp
+
 .git
+*.sublime-project
+aws_machines
+Brewfile
+build_times
+build_types
+codeship-services.yml
+codeship-steps*
+codeship.aes
+CONTRIBUTING.md
+COPYRIGHT.txt
+LICENSE.txt
+README.md
+tmp
+Vagrantfile

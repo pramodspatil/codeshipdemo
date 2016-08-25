@@ -39,10 +39,13 @@ RUN \
   && mv "/tmp/phantomjs-${PHANTOMJS_VERSION}-linux-x86_64/bin/phantomjs" /usr/bin/phantomjs \
   && rm -rf /tmp/phantomjs-linux-x86_64.tar.bz2 "/tmp/phantomjs-${PHANTOMJS_VERSION}-linux-x86_64"
 
-COPY Gemfile Gemfile.lock vendor /app/
+RUN mkdir /code
+WORKDIR /code
+
+COPY Gemfile Gemfile.lock vendor ./
 RUN \
   cd /app/ \
   && bundle install --jobs 20 --retry 5 \
   && gem install parallel_tests
 
-WORKDIR /code
+COPY . ./
