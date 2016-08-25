@@ -58,3 +58,6 @@ RUN \
   && gem install parallel_tests
 
 COPY . ./
+
+RUN \
+  mkdir -p ./public/backups/default tmp
