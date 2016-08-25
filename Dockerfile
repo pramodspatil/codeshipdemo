@@ -2,19 +2,27 @@ FROM ruby:2.3.1-slim
 MAINTAINER maintainers@codeship.com
 
 ENV \
-  DEBIAN_FRONTEND=noninteractive \
-  PHANTOMJS_VERSION=1.9.7
+  DEBIAN_DISTRIBUTION="jessie" \
+  DEBIAN_FRONTEND="noninteractive" \
+  NODE_VERSION="4.x" \
+  PHANTOMJS_VERSION="1.9.7"
 
 RUN \
   apt-get update \
   && apt-get install -y --no-install-recommends \
+    apt-transport-https \
+  && curl -s https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add - \
+  && echo "deb https://deb.nodesource.com/node_${NODE_VERSION} ${DEBIAN_DISTRIBUTION} main" > /etc/apt/sources.list.d/nodesource.list && \
+  && apt-get update && \
+  && apt-get install -y --no-install-recommends \
+    postgresql-client-9.4 \
     apt-utils \
     build-essential \
     bzip2 \
     gifsicle \
     git \
     graphicsmagick-imagemagick-compat \
-  	jhead \
+    jhead \
     jpegoptim \
     libfontconfig \
     libfreetype6 \
@@ -22,14 +30,16 @@ RUN \
     libpq-dev \
     nodejs \
     optipng \
+    postgresql-client-9.4
     python-pip \
-  	postgresql-client-9.4 \
     time \
     vim \
     wget \
   && apt-get clean -y \
   && rm -rf /var/lib/apt/lists/* \
   && pip install awscli \
+  && npm config set "production" "true" \
+  && npm config set "loglevel" "error" \
   && npm install npm -g \
   && npm install -g svgo
 
