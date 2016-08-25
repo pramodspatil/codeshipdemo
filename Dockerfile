@@ -12,8 +12,8 @@ RUN \
   && apt-get install -y --no-install-recommends \
     apt-transport-https \
   && curl -s https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add - \
-  && echo "deb https://deb.nodesource.com/node_${NODE_VERSION} ${DEBIAN_DISTRIBUTION} main" > /etc/apt/sources.list.d/nodesource.list && \
-  && apt-get update && \
+  && echo "deb https://deb.nodesource.com/node_${NODE_VERSION} ${DEBIAN_DISTRIBUTION} main" > /etc/apt/sources.list.d/nodesource.list \
+  && apt-get update \
   && apt-get install -y --no-install-recommends \
     postgresql-client-9.4 \
     apt-utils \
@@ -30,7 +30,7 @@ RUN \
     libpq-dev \
     nodejs \
     optipng \
-    postgresql-client-9.4
+    postgresql-client-9.4 \
     python-pip \
     time \
     vim \
@@ -54,8 +54,7 @@ WORKDIR /code
 
 COPY Gemfile Gemfile.lock vendor ./
 RUN \
-  cd /app/ \
-  && bundle install --jobs 20 --retry 5 \
+  bundle install --jobs 20 --retry 5 \
   && gem install parallel_tests
 
 COPY . ./
