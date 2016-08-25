@@ -3,6 +3,8 @@ app:
     dockerfile_path: Dockerfile
   environment:
     DATABASE_HOST: postgresql
+    PGHOST: postgresql
+    PGUSER: postgres
     RAILS_ENV: test
     REDIS_ADDRESS: redis://redis:6379
     SECRET_TOKEN: abcdefghij
