@@ -11,12 +11,19 @@ RUN \
     apt-utils \
     build-essential \
     bzip2 \
+    gifsicle \
     git \
+    graphicsmagick-imagemagick-compat \
+  	jhead \
+    jpegoptim \
     libfontconfig \
     libfreetype6 \
+    libjpeg-progs \
     libpq-dev \
     nodejs \
+    optipng \
     python-pip \
+  	postgresql-client-9.4 \
     time \
     vim \
     wget \
